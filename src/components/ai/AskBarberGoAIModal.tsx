@@ -17,13 +17,13 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 
-interface AskBarberGoAIModalProps {
+interface AskBarberPilotAIModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectServiceAndBook?: (category: string, notes?: string) => void;
 }
 
-export const AskBarberGoAIModal: React.FC<AskBarberGoAIModalProps> = ({
+export const AskBarberPilotAIModal: React.FC<AskBarberPilotAIModalProps> = ({
   isOpen,
   onClose,
   onSelectServiceAndBook
@@ -37,7 +37,7 @@ export const AskBarberGoAIModal: React.FC<AskBarberGoAIModalProps> = ({
   >([
     {
       sender: 'ai',
-      text: "Hello! I'm your BarberGo AI Stylist. Ask me anything about haircut styles, tapers vs fades, face shape recommendations, or which service you should book today."
+      text: "Hello! I'm your BarberPilot AI Stylist. Ask me anything about haircut styles, tapers vs fades, face shape recommendations, or which service you should book today."
     }
   ]);
   const [loading, setLoading] = useState(false);
@@ -113,7 +113,7 @@ export const AskBarberGoAIModal: React.FC<AskBarberGoAIModalProps> = ({
         ...prev,
         {
           sender: 'ai',
-          text: "A clean low fade or classic textured scissor crop works wonderfully. Master barbers on BarberGo carry specialized clippers and foil shavers to customize your silhouette.",
+          text: "A clean low fade or classic textured scissor crop works wonderfully. Master barbers on BarberPilot carry specialized clippers and foil shavers to customize your silhouette.",
           recommendedCategory: 'Haircut',
           notesToBarber: 'Textured crop with natural neck taper'
         }
@@ -132,7 +132,7 @@ export const AskBarberGoAIModal: React.FC<AskBarberGoAIModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto" id="ask-barbergo-ai-modal">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto" id="ask-barberpilot-ai-modal">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -147,7 +147,7 @@ export const AskBarberGoAIModal: React.FC<AskBarberGoAIModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white">Ask BarberGo AI</h3>
+                <h3 className="text-sm font-bold text-white">Ask BarberPilot AI</h3>
                 <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400">Stylist Assistant</span>
               </div>
               <p className="text-[11px] text-slate-400">Style guidance, service matching & barber notes</p>

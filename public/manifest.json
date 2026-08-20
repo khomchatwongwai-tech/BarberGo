@@ -1,0 +1,19 @@
+{
+  "short_name": "BarberPilot",
+  "name": "BarberPilot — On-Demand Mobile Barber Marketplace",
+  "id": "com.wongwaigroup.barberpilot",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "description": "Book top-rated licensed mobile barbers on demand with real-time GPS tracking and instant dispatch."
+}

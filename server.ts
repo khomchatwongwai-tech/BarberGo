@@ -53,6 +53,17 @@ async function startServer() {
   const canAccessBooking = (user: ReturnType<typeof requestUser>, booking: Booking) =>
     Boolean(user && (user.role === 'admin' || user.role === 'support' || booking.customerId === user.id || booking.barberId === user.id));
 
+
+  // Canonical Domain & Legacy Domain Redirect Middleware (BarberGo -> BarberPilot)
+  app.use((req, res, next) => {
+    const host = req.headers.host || '';
+    if (host.includes('barbergo.com') || host.includes('barber-go.com')) {
+      const targetUrl = 'https://barberpilot.com' + req.originalUrl;
+      return res.redirect(301, targetUrl);
+    }
+    next();
+  });
+
   // Request logger
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) {
@@ -1149,7 +1160,7 @@ async function startServer() {
         csv += `"${b.id}","${b.date}","${b.time}","${b.customerName}","${b.barberName}","${b.service.name}",${b.pricing.finalTotal},"${b.status}",${b.pricing.platformFee},${b.pricing.barberEarnings.netPayout}\n`;
       });
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename=barbergo-bookings.csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=barberpilot-bookings.csv');
       return res.send(csv);
     }
     res.status(400).send('Invalid export type');
@@ -1254,7 +1265,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`BarberGo Server running at http://localhost:${PORT}`);
+    console.log(`BarberPilot Server running at http://localhost:${PORT}`);
   });
 }
 

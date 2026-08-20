@@ -35,7 +35,7 @@ import { AdminPaymentsView } from './components/admin/AdminPaymentsView';
 import { SupportQueueView } from './components/support/SupportQueueView';
 
 // AI Drawers and Modals
-import { AskBarberGoAIModal } from './components/ai/AskBarberGoAIModal';
+import { AskBarberPilotAIModal } from './components/ai/AskBarberGoAIModal';
 import { AISupportDrawer } from './components/ai/AISupportDrawer';
 import { AIBioModal } from './components/ai/AIBioModal';
 
@@ -207,9 +207,9 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {/* Invisible AI: Consolidated Ask BarberGo AI Stylist Assistant */}
+      {/* Invisible AI: Consolidated Ask BarberPilot AI Stylist Assistant */}
       {showAskAI && (
-        <AskBarberGoAIModal
+        <AskBarberPilotAIModal
           isOpen={showAskAI}
           onClose={() => setShowAskAI(false)}
           onSelectServiceAndBook={(category, notes) => {

@@ -249,7 +249,7 @@ export const MessagesInboxView: React.FC = () => {
               {/* Messages Body */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-center text-xs text-slate-400">
-                  <span className="text-amber-400 font-bold">🔒 BarberGo Encrypted Channel</span>
+                  <span className="text-amber-400 font-bold">🔒 BarberPilot Encrypted Channel</span>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Messages are protected. Use this channel to share arrival gate codes, parking instructions, or haircut photos.
                   </p>

@@ -34,8 +34,8 @@ export class DataStore {
 
   constructor() {
     this.settings = {
-      appName: 'BarberGo',
-      logoText: 'BarberGo',
+      appName: 'BarberPilot',
+      logoText: 'BarberPilot',
       tagline: 'Master Barbers Delivered to Your Door',
       primaryColor: '#0F172A',
       accentColor: '#D97706', // Premium warm gold
@@ -129,7 +129,7 @@ export class DataStore {
 
     const barber1User: User = {
       id: 'barber-1',
-      email: 'devon.carter@barbergo.pro',
+      email: 'devon.carter@barberpilot.pro',
       phone: '+1 (415) 555-0144',
       role: 'barber',
       fullName: 'Devon "Blade" Carter',
@@ -145,7 +145,7 @@ export class DataStore {
 
     const barber2User: User = {
       id: 'barber-2',
-      email: 'sofia.reyes@barbergo.pro',
+      email: 'sofia.reyes@barberpilot.pro',
       phone: '+1 (415) 555-0178',
       role: 'barber',
       fullName: 'Sofia Reyes',
@@ -161,7 +161,7 @@ export class DataStore {
 
     const barber3User: User = {
       id: 'barber-3',
-      email: 'jamal.washington@barbergo.pro',
+      email: 'jamal.washington@barberpilot.pro',
       phone: '+1 (510) 555-0129',
       role: 'barber',
       fullName: 'Jamal Washington',
@@ -177,7 +177,7 @@ export class DataStore {
 
     const adminUser: User = {
       id: 'admin-1',
-      email: 'alexandra.chen@barbergo.app',
+      email: 'alexandra.chen@barberpilot.app',
       phone: '+1 (415) 555-0100',
       role: 'admin',
       fullName: 'Alexandra Chen (Platform Director)',
@@ -193,7 +193,7 @@ export class DataStore {
 
     const supportUser: User = {
       id: 'support-1',
-      email: 'jordan.rivera@barbergo.app',
+      email: 'jordan.rivera@barberpilot.app',
       phone: '+1 (415) 555-0111',
       role: 'support',
       fullName: 'Jordan Rivera (Lead Support Specialist)',

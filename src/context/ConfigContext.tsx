@@ -9,8 +9,8 @@ interface ConfigContextType {
 }
 
 const defaultSettings: PlatformSettings = {
-  appName: 'BarberGo',
-  logoText: 'BarberGo',
+  appName: 'BarberPilot',
+  logoText: 'BarberPilot',
   tagline: 'Master Barbers Delivered to Your Door',
   primaryColor: '#0F172A',
   accentColor: '#D97706',

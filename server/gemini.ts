@@ -33,7 +33,7 @@ export async function getHaircutConsultation(data: {
   vibe?: string;
 }) {
   const ai = getGeminiClient();
-  const prompt = `You are an elite master mobile barber stylist for BarberGo.
+  const prompt = `You are an elite master mobile barber stylist for BarberPilot.
 Provide an expert, professional, and practical haircut consultation based on the following client details:
 - Hair Type/Texture: ${data.hairType}
 - Face Shape: ${data.faceShape || 'Oval / Athletic'}
@@ -46,7 +46,7 @@ Please format the response in clean, crisp Markdown with:
 2. Precise Clipper & Shears Technical Guide for the Barber (guard numbers, taper line, transition)
 3. Facial Hair & Line-Up Pairing
 4. Daily Styling & Maintenance (recommended product: pomade, matte clay, sea salt spray, or beard oil)
-5. Practical Barber Note (a short 1-sentence prompt the customer can copy into their BarberGo appointment notes).`;
+5. Practical Barber Note (a short 1-sentence prompt the customer can copy into their BarberPilot appointment notes).`;
 
   if (!ai) {
     return `### Recommended Style: Tailored Mid-Skin Taper Fade with Textured Crop\n\n**Technical Guide for Barber:**\n- Start with #0.5 closed on the temple and nape, blending seamlessly into #1.5 open around the parietal ridge.\n- Point-cut scissors on top with 1.5 inches length retained for natural flow and texture.\n- Clean razor outline along the front temple arches and neckline.\n\n**Beard & Line-Up Pairing:**\n- Natural cheek gradient, faded sideburns connecting smoothly into a sharp 4mm boxed beard.\n\n**Daily Styling & Maintenance:**\n- Apply a dime-sized amount of matte texturizing clay on towel-damp hair. Finish with botanical cooling spray.\n\n**Barber Appointment Note:**\n*"Mid-skin taper with textured scissor crop on top, razor neck lineup, and conditioned beard trim."*`;
@@ -72,7 +72,7 @@ export async function generateBarberBio(data: {
   vibe: string;
 }) {
   const ai = getGeminiClient();
-  const prompt = `Write a high-converting, professional, 3-paragraph bio for a licensed mobile barber on the BarberGo platform.
+  const prompt = `Write a high-converting, professional, 3-paragraph bio for a licensed mobile barber on the BarberPilot platform.
 - Name: ${data.barberName}
 - Experience: ${data.experienceYears} years
 - City / Service Area: ${data.city}
@@ -104,7 +104,7 @@ export async function generateServiceDescription(data: {
   durationMinutes: number;
 }) {
   const ai = getGeminiClient();
-  const prompt = `Write an enticing, premium service description (3-4 sentences) for a mobile barber menu item on BarberGo.
+  const prompt = `Write an enticing, premium service description (3-4 sentences) for a mobile barber menu item on BarberPilot.
 - Service Name: ${data.serviceName}
 - Category: ${data.category}
 - Price: $${data.price}
@@ -133,7 +133,7 @@ export async function getSupportAssistantReply(data: {
   userRole: string;
 }) {
   const ai = getGeminiClient();
-  const prompt = `You are BarberGo Assistant, the official AI support copilot for BarberGo (on-demand mobile barber marketplace).
+  const prompt = `You are BarberPilot Assistant, the official AI support copilot for BarberPilot (on-demand mobile barber marketplace).
 User Role: ${data.userRole}
 User Inquiry: "${data.userQuery}"
 
@@ -147,7 +147,7 @@ Platform Policies Reference:
 Respond in a warm, professional, concise, and helpful manner (under 120 words).`;
 
   if (!ai) {
-    return `Hello! On BarberGo, cancellations made more than 24 hours before your appointment are eligible for a 100% full refund. For cancellations within 24 hours, a 50% late fee applies to compensate the mobile barber for their reserved travel slot. Barbers receive 100% of all customer tips. If you need immediate assistance with an active booking, you can also reach our 24/7 support team through the Help tab.`;
+    return `Hello! On BarberPilot, cancellations made more than 24 hours before your appointment are eligible for a 100% full refund. For cancellations within 24 hours, a 50% late fee applies to compensate the mobile barber for their reserved travel slot. Barbers receive 100% of all customer tips. If you need immediate assistance with an active booking, you can also reach our 24/7 support team through the Help tab.`;
   }
 
   try {
@@ -155,9 +155,9 @@ Respond in a warm, professional, concise, and helpful manner (under 120 words).`
       model: 'gemini-3.7-flash',
       contents: prompt
     });
-    return response.text || 'We are here to help! Please let us know how we can assist with your BarberGo experience.';
+    return response.text || 'We are here to help! Please let us know how we can assist with your BarberPilot experience.';
   } catch (err) {
     console.error('Gemini support bot error:', err);
-    return 'Thank you for reaching out to BarberGo support. Our team is dedicated to providing smooth, safe mobile barber appointments.';
+    return 'Thank you for reaching out to BarberPilot support. Our team is dedicated to providing smooth, safe mobile barber appointments.';
   }
 }

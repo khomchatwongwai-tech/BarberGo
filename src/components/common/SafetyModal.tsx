@@ -79,7 +79,7 @@ export const SafetyModal: React.FC<SafetyModalProps> = ({ isOpen, onClose }) => 
               <ShieldAlert className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">BarberGo Trust & Safety Shield</h3>
+              <h3 className="text-base font-bold text-white">BarberPilot Trust & Safety Shield</h3>
               <p className="text-xs text-red-300">24/7 Real-Time Incident Protection & Emergency Helpline</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ export const SafetyModal: React.FC<SafetyModalProps> = ({ isOpen, onClose }) => 
                 <p className="text-xs text-slate-400">{customerProfile.emergencyContact.phone}</p>
               </div>
               <a
-                href={`sms:${customerProfile.emergencyContact.phone}?body=BarberGo%20Safety%20Notice:%20I%20am%20at%20my%20appointment%20location.`}
+                href={`sms:${customerProfile.emergencyContact.phone}?body=BarberPilot%20Safety%20Notice:%20I%20am%20at%20my%20appointment%20location.`}
                 className="flex items-center gap-1 rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-slate-700"
               >
                 <Share2 className="h-3.5 w-3.5" />

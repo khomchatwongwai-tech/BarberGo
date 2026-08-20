@@ -1,5 +1,5 @@
 {
-  "name": "BarberGo",
+  "name": "BarberPilot",
   "description": "On-demand mobile barber marketplace connecting customers with vetted freelance barbers at their home, hotel, or office.",
   "requestFramePermissions": ["geolocation", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

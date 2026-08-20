@@ -62,7 +62,7 @@ export const LiveMap: React.FC<LiveMapProps> = ({
   const userPoint = project(userLocation.lat, userLocation.lng);
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-slate-800 bg-[#0c121e] shadow-2xl ${className}`} id="barbergo-live-map">
+    <div className={`relative overflow-hidden rounded-2xl border border-slate-800 bg-[#0c121e] shadow-2xl ${className}`} id="barberpilot-live-map">
       {/* Map Canvas Background Grid */}
       <svg className="h-full w-full select-none" viewBox={`0 0 ${mapWidth} ${mapHeight}`}>
         <defs>

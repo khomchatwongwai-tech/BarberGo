@@ -272,7 +272,7 @@ export const BarberDetailModal: React.FC<BarberDetailModalProps> = ({
               <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
                 <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                  BarberGo Trust & Safety Clearances
+                  BarberPilot Trust & Safety Clearances
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="flex items-center gap-2 text-slate-300">

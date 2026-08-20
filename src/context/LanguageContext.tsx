@@ -13,7 +13,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export function detectInitialLanguage(): SupportedLanguage {
   try {
-    const saved = localStorage.getItem('barberpilot_language') || localStorage.getItem('barbergo_language');
+    const saved = localStorage.getItem('barberpilot_language') || localStorage.getItem('barberpilot_language');
     if (saved && ['en', 'es', 'zh', 'th', 'ko', 'ja', 'vi', 'fr'].includes(saved)) {
       return saved as SupportedLanguage;
     }
@@ -47,7 +47,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode; initialLang?: Sup
     setCurrentLanguageState(lang);
     try {
       localStorage.setItem('barberpilot_language', lang);
-      localStorage.setItem('barbergo_language', lang);
+      localStorage.setItem('barberpilot_language', lang);
     } catch {}
     if (typeof document !== 'undefined') {
       document.documentElement.lang = lang;

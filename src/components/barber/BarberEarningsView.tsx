@@ -129,7 +129,7 @@ export const BarberEarningsView: React.FC = () => {
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Building2 className="h-5 w-5 text-amber-400" />
-              BarberGo Monthly Volume Tier
+              BarberPilot Monthly Volume Tier
             </h3>
             <p className="text-xs text-slate-400">
               Transparent monthly flat software subscriptions. No percentage cut taken from your cuts or tips!

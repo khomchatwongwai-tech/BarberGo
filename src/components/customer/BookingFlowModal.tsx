@@ -609,7 +609,7 @@ export const BookingFlowModal: React.FC<BookingFlowModalProps> = ({
             <div className="space-y-4">
               <div className="text-left">
                 <h3 className="text-base font-bold text-white">Step 4: Select Your Barber</h3>
-                <p className="text-xs text-slate-400">Use BarberGo Smart Match or select a specific vetted provider.</p>
+                <p className="text-xs text-slate-400">Use BarberPilot Smart Match or select a specific vetted provider.</p>
               </div>
 
               {/* Smart Match Banner Option */}
@@ -631,7 +631,7 @@ export const BookingFlowModal: React.FC<BookingFlowModalProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-white">BarberGo Smart Match</h4>
+                        <h4 className="text-sm font-bold text-white">BarberPilot Smart Match</h4>
                         <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400">Recommended</span>
                       </div>
                       <p className="text-xs text-slate-400">

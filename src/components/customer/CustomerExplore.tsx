@@ -155,7 +155,7 @@ export const CustomerExplore: React.FC<CustomerExploreProps> = ({
           className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-400/20 to-amber-500/10 border border-amber-500/40 px-3.5 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500/30 transition-all shadow-sm shadow-amber-500/10"
         >
           <Sparkles className="h-4 w-4 text-amber-400" />
-          <span>Ask BarberGo AI Stylist</span>
+          <span>Ask BarberPilot AI Stylist</span>
         </button>
       </div>
 
