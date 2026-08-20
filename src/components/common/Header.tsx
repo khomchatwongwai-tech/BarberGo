@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { useConfig } from '../../context/ConfigContext';
-import {
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
+import { SupportedLanguage } from '../../types';
+import {  useAuth } from '../../context/AuthContext';
+import {  useConfig } from '../../context/ConfigContext';
+import { 
   Scissors,
   Bell,
   Sparkles,
@@ -13,7 +15,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { SafetyModal } from './SafetyModal';
+import {  SafetyModal } from './SafetyModal';
 
 interface HeaderProps {
   activeTab?: string;
@@ -25,6 +27,10 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  // i18n hook
+
+  // i18n hook
+
   activeTab,
   onNavigate,
   onOpenHaircutAI,
@@ -34,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, notifications, unreadNotificationCount, markNotificationRead } = useAuth();
   const { settings } = useConfig();
+  const { currentLanguage, setLanguage, t } = useLanguage();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
 
@@ -116,6 +123,26 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="hidden md:inline">Support</span>
               </button>
             )}
+
+            {/* Language Selector Dropdown */}
+            <div className="relative">
+              <select
+                value={currentLanguage}
+                onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
+                className="flex h-9 items-center rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500"
+                id="header-language-select"
+                title={t('interfaceLanguage')}
+              >
+                <option value="en">🇺🇸 EN</option>
+                <option value="es">🇪🇸 ES</option>
+                <option value="zh">🇨🇳 ZH</option>
+                <option value="th">🇹🇭 TH</option>
+                <option value="ko">🇰🇷 KO</option>
+                <option value="ja">🇯🇵 JA</option>
+                <option value="vi">🇻🇳 VI</option>
+                <option value="fr">🇫🇷 FR</option>
+              </select>
+            </div>
 
             {/* Notification Bell with Dropdown */}
             <div className="relative">

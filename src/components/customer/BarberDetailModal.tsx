@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -31,6 +32,8 @@ export const BarberDetailModal: React.FC<BarberDetailModalProps> = ({
   onClose,
   onStartBooking
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'services' | 'portfolio' | 'reviews' | 'about'>('services');

@@ -1,8 +1,11 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { Tag, Plus, Check, Trash2, Calendar, Percent, Sparkles, Loader2 } from 'lucide-react';
 import { PromoCode } from '../../types';
 
 export const AdminPromoCodesView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [promos, setPromos] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);

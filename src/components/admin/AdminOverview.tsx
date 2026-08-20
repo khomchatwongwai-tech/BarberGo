@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useConfig } from '../../context/ConfigContext';
 import {
@@ -28,6 +29,8 @@ interface AdminStats {
 }
 
 export const AdminOverview: React.FC<{ onNavigate: (tab: string) => void }> = ({ onNavigate }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { settings } = useConfig();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);

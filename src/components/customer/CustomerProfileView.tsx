@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -19,6 +20,8 @@ import { motion } from 'motion/react';
 import { Address } from '../../types';
 
 export const CustomerProfileView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const {
     user,
     customerProfile,

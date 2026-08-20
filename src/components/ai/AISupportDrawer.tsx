@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useConfig } from '../../context/ConfigContext';
@@ -17,6 +18,8 @@ interface ChatItem {
 }
 
 export const AISupportDrawer: React.FC<AISupportDrawerProps> = ({ isOpen, onClose }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user } = useAuth();
   const { settings } = useConfig();
   const [messages, setMessages] = useState<ChatItem[]>([

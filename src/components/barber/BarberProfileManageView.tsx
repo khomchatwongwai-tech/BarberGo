@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -18,6 +19,8 @@ import { Service, ServiceAddon } from '../../types';
 import { AIBioModal } from '../ai/AIBioModal';
 
 export const BarberProfileManageView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const {
     user,
     barberProfile,

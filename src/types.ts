@@ -423,3 +423,5 @@ export interface ParsedSearchQuery {
   specialty?: string;
   targetCity?: string;
 }
+
+export type SupportedLanguage = 'en' | 'es' | 'zh' | 'th' | 'ko' | 'ja' | 'vi' | 'fr';

@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { Sparkles, X, Scissors, Copy, Check, Wand2, Lightbulb, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -13,6 +14,8 @@ export const AIHaircutModal: React.FC<AIHaircutModalProps> = ({
   onClose,
   onApplyNotes
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [hairType, setHairType] = useState('Thick & Textured');
   const [faceShape, setFaceShape] = useState('Oval');
   const [desiredLook, setDesiredLook] = useState('Modern Skin Taper Fade with Scissor Texture');

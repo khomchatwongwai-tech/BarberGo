@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Booking } from '../../types';
@@ -18,6 +19,8 @@ import {
 import { ChatModal } from '../messaging/ChatModal';
 
 export const BarberRequestsView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user } = useAuth();
   const [requests, setRequests] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);

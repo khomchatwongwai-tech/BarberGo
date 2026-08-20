@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import {
   Sparkles,
@@ -27,6 +28,8 @@ export const AskBarberGoAIModal: React.FC<AskBarberGoAIModalProps> = ({
   onClose,
   onSelectServiceAndBook
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { customerProfile } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<

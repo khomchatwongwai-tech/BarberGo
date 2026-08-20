@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useConfig } from '../../context/ConfigContext';
@@ -18,6 +19,8 @@ import {
 import { Booking } from '../../types';
 
 export const BarberEarningsView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user, barberProfile, updateBarberProfile, refreshAuth } = useAuth();
   const { settings } = useConfig();
 

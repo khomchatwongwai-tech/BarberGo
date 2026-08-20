@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { useConfig } from '../../context/ConfigContext';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +22,8 @@ interface SafetyModalProps {
 }
 
 export const SafetyModal: React.FC<SafetyModalProps> = ({ isOpen, onClose }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { settings } = useConfig();
   const { user, customerProfile } = useAuth();
 

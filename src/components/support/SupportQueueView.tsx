@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import {
   LifeBuoy,
@@ -15,6 +16,8 @@ import {
 import { Dispute } from '../../types';
 
 export const SupportQueueView: React.FC<{ onOpenAICopilot: () => void }> = ({ onOpenAICopilot }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);

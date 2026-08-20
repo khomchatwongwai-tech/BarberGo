@@ -14,7 +14,9 @@ import { Booking, BookingStatus, UserRole } from './src/types';
 
 dotenv.config();
 
-let currentUserId = 'cust-1'; // Default test user
+// The in-memory store is intentionally a local/demo backend.  Never treat the
+// role switcher as authentication in a deployed environment.
+let currentUserId = 'cust-1';
 
 async function startServer() {
   const app = express();
@@ -22,6 +24,34 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+
+  const isDemoMode = (process.env.APP_MODE || 'demo') !== 'production';
+  const requestUser = (req: express.Request) => {
+    // The header is useful for deterministic integration tests and local
+    // development only. A real deployment must place a verified identity here
+    // at the edge (or replace this store with Supabase Auth-backed lookups).
+    const headerUserId = req.header('x-user-id');
+    return db.users.get(isDemoMode && headerUserId ? headerUserId : currentUserId);
+  };
+  const requireUser = (req: express.Request, res: express.Response) => {
+    const user = requestUser(req);
+    if (!user || (!isDemoMode && !req.header('x-user-id'))) {
+      res.status(401).json({ error: 'Authentication required' });
+      return null;
+    }
+    return user;
+  };
+  const requireRoles = (req: express.Request, res: express.Response, roles: UserRole[]) => {
+    const user = requireUser(req, res);
+    if (!user) return null;
+    if (!roles.includes(user.role)) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return null;
+    }
+    return user;
+  };
+  const canAccessBooking = (user: ReturnType<typeof requestUser>, booking: Booking) =>
+    Boolean(user && (user.role === 'admin' || user.role === 'support' || booking.customerId === user.id || booking.barberId === user.id));
 
   // Request logger
   app.use((req, res, next) => {
@@ -43,6 +73,7 @@ async function startServer() {
   });
 
   app.post('/api/config', (req, res) => {
+    if (!requireRoles(req, res, ['admin'])) return;
     const updates = req.body;
     db.settings = { ...db.settings, ...updates };
 
@@ -64,7 +95,8 @@ async function startServer() {
   // AUTH & USERS (Seamless 4-Role Testing Switcher)
   // ----------------------------------------------------
   app.get('/api/auth/me', (req, res) => {
-    const user = db.users.get(currentUserId) || db.users.get('cust-1')!;
+    const user = requireUser(req, res);
+    if (!user) return;
     const customerProfile = db.customerProfiles.get(user.id);
     const barberProfile = db.barberProfiles.get(user.id);
     const services = db.services.get(user.id) || [];
@@ -82,6 +114,8 @@ async function startServer() {
   });
 
   app.post('/api/auth/switch-role', (req, res) => {
+    if (!isDemoMode) return res.status(404).json({ error: 'Not available in production' });
+    if (!requireUser(req, res)) return;
     const { role, userId } = req.body;
     if (userId && db.users.has(userId)) {
       currentUserId = userId;
@@ -98,7 +132,7 @@ async function startServer() {
 
   app.post('/api/auth/update-profile', (req, res) => {
     const { fullName, phone, avatarUrl, preferences, emergencyContact, addresses } = req.body;
-    const user = db.users.get(currentUserId);
+    const user = requireUser(req, res);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (fullName) user.fullName = fullName;
@@ -127,7 +161,7 @@ async function startServer() {
 
   app.post('/api/auth/verify-contact', (req, res) => {
     const { type } = req.body; // 'email' | 'phone'
-    const user = db.users.get(currentUserId);
+    const user = requireUser(req, res);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (type === 'email') user.emailVerified = true;
@@ -319,6 +353,11 @@ async function startServer() {
 
   app.post('/api/barbers/:id/update-profile', (req, res) => {
     const barberId = req.params.id;
+    const actor = requireUser(req, res);
+    if (!actor) return;
+    if (actor.role !== 'admin' && (actor.role !== 'barber' || actor.id !== barberId)) {
+      return res.status(403).json({ error: 'You can only edit your own barber profile' });
+    }
     const profile = db.barberProfiles.get(barberId);
     if (!profile) return res.status(404).json({ error: 'Barber not found' });
 
@@ -328,6 +367,11 @@ async function startServer() {
 
   app.post('/api/barbers/:id/update-services', (req, res) => {
     const barberId = req.params.id;
+    const actor = requireUser(req, res);
+    if (!actor) return;
+    if (actor.role !== 'admin' && (actor.role !== 'barber' || actor.id !== barberId)) {
+      return res.status(403).json({ error: 'You can only edit your own services' });
+    }
     const { services } = req.body;
     if (!services || !Array.isArray(services)) {
       return res.status(400).json({ error: 'Invalid services array' });
@@ -339,6 +383,11 @@ async function startServer() {
 
   app.post('/api/barbers/:id/update-availability', (req, res) => {
     const barberId = req.params.id;
+    const actor = requireUser(req, res);
+    if (!actor) return;
+    if (actor.role !== 'admin' && (actor.role !== 'barber' || actor.id !== barberId)) {
+      return res.status(403).json({ error: 'You can only edit your own availability' });
+    }
     const { availability } = req.body;
     if (!availability) return res.status(400).json({ error: 'Invalid availability object' });
 
@@ -348,6 +397,11 @@ async function startServer() {
 
   app.post('/api/barbers/:id/upload-document', (req, res) => {
     const barberId = req.params.id;
+    const actor = requireUser(req, res);
+    if (!actor) return;
+    if (actor.role !== 'admin' && (actor.role !== 'barber' || actor.id !== barberId)) {
+      return res.status(403).json({ error: 'You can only upload your own documents' });
+    }
     const { type, name, fileUrl } = req.body;
 
     const doc = {

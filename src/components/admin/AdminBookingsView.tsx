@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { Booking } from '../../types';
 import {
@@ -15,6 +16,8 @@ import {
 } from 'lucide-react';
 
 export const AdminBookingsView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');

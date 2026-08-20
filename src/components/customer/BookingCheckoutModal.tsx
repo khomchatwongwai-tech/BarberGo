@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useConfig } from '../../context/ConfigContext';
@@ -38,6 +39,8 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
   onClose,
   onBookingComplete
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user, customerProfile, userCoords, refreshAuth } = useAuth();
   const { settings } = useConfig();
 

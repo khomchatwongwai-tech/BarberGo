@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { useConfig } from '../../context/ConfigContext';
 import {
@@ -19,6 +20,8 @@ import {
 import { PlatformSettings } from '../../types';
 
 export const AdminSettingsView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { settings, updateSettings } = useConfig();
 
   const [formData, setFormData] = useState<PlatformSettings>(settings);

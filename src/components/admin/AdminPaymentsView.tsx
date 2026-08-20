@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useConfig } from '../../context/ConfigContext';
 import {
@@ -16,6 +17,8 @@ import {
 import { Booking } from '../../types';
 
 export const AdminPaymentsView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { settings } = useConfig();
   const [metrics, setMetrics] = useState<any | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);

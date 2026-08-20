@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import {
   FileCheck2,
@@ -13,6 +14,8 @@ import {
 import { BarberDocument } from '../../types';
 
 export const AdminBarberVerificationView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [documents, setDocuments] = useState<BarberDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);

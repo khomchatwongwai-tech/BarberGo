@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useConfig } from '../../context/ConfigContext';
@@ -46,6 +47,8 @@ export const BookingFlowModal: React.FC<BookingFlowModalProps> = ({
   initialCategory,
   onBookingCreated
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user, customerProfile, userCoords } = useAuth();
   const { settings } = useConfig();
 

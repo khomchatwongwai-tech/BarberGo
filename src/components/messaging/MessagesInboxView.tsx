@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -19,6 +20,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Message } from '../../types';
 
 export const MessagesInboxView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user } = useAuth();
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

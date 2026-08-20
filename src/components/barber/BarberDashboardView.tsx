@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useConfig } from '../../context/ConfigContext';
@@ -32,6 +33,8 @@ export const BarberDashboardView: React.FC<BarberDashboardViewProps> = ({
   onNavigateTab,
   onOpenBioGenerator
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user, barberProfile, updateBarberProfile, refreshAuth } = useAuth();
   const { settings } = useConfig();
 

@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Booking, BookingStatus } from '../../types';
@@ -28,6 +29,8 @@ interface CustomerBookingsViewProps {
 }
 
 export const CustomerBookingsView: React.FC<CustomerBookingsViewProps> = ({ onOpenConsultation, onBookAgain }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);

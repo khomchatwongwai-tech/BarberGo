@@ -1,4 +1,6 @@
 import React from 'react';
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
+import { SupportedLanguage } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useConfig } from '../../context/ConfigContext';
 import { UserRole } from '../../types';
@@ -6,33 +8,35 @@ import { User, Scissors, ShieldAlert, Headphones, RefreshCw } from 'lucide-react
 
 export const RoleSwitcherBar: React.FC = () => {
   const { user, switchRole, loading, refreshAuth } = useAuth();
+  const { currentLanguage, setLanguage } = useLanguage();
+  const { t } = useTranslation();
   const { settings } = useConfig();
 
   const roles: { role: UserRole; label: string; icon: React.ReactNode; desc: string; sampleName: string }[] = [
     {
       role: 'customer',
-      label: 'Customer',
+      label: t('customerRole'),
       icon: <User className="h-3.5 w-3.5" />,
       desc: 'Book, Track, Pay, Tip, Review',
       sampleName: 'Marcus Vance'
     },
     {
       role: 'barber',
-      label: 'Barber (Freelancer)',
+      label: t('barberRole'),
       icon: <Scissors className="h-3.5 w-3.5" />,
       desc: 'Accept Bookings, GPS En-Route, Earnings',
       sampleName: 'Devon Blade'
     },
     {
       role: 'admin',
-      label: 'Administrator',
+      label: t('adminRole'),
       icon: <ShieldAlert className="h-3.5 w-3.5" />,
       desc: 'Branding, Fees, Verifications, Disputes',
       sampleName: 'Alexandra Chen'
     },
     {
       role: 'support',
-      label: 'Support Agent',
+      label: t('supportRole'),
       icon: <Headphones className="h-3.5 w-3.5" />,
       desc: 'Disputes, Live Inquiries, AI Copilot',
       sampleName: 'Jordan Rivera'
@@ -54,7 +58,7 @@ export const RoleSwitcherBar: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-          <span className="text-[11px] text-slate-500 mr-1 hidden md:inline font-medium">Switch Role:</span>
+          <span className="text-[11px] text-slate-500 mr-1 hidden md:inline font-medium">{t('switchRole')}:</span>
           {roles.map((r) => {
             const isActive = user?.role === r.role;
             return (
@@ -75,6 +79,21 @@ export const RoleSwitcherBar: React.FC = () => {
               </button>
             );
           })}
+          <select
+            value={currentLanguage}
+            onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}
+            className="flex h-6 items-center rounded-lg border border-slate-200 bg-white px-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 cursor-pointer focus:outline-none"
+            id="sandbox-language-select"
+          >
+            <option value="en">🇺🇸 EN</option>
+            <option value="es">🇪🇸 ES</option>
+            <option value="zh">🇨🇳 ZH</option>
+            <option value="th">🇹🇭 TH</option>
+            <option value="ko">🇰🇷 KO</option>
+            <option value="ja">🇯🇵 JA</option>
+            <option value="vi">🇻🇳 VI</option>
+            <option value="fr">🇫🇷 FR</option>
+          </select>
           <button
             onClick={() => refreshAuth()}
             className="flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"

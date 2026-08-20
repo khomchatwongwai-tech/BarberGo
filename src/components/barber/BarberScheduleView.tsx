@@ -1,9 +1,12 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Clock, MapPin, Save, Shield, Calendar, AlertCircle, Check } from 'lucide-react';
 import { BarberAvailability } from '../../types';
 
 export const BarberScheduleView: React.FC = () => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { barberProfile, barberAvailability, updateBarberProfile } = useAuth();
 
   const [travelRadius, setTravelRadius] = useState(barberProfile?.travelRadiusMiles || 20);

@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Message, Booking } from '../../types';
@@ -11,6 +12,8 @@ interface ChatModalProps {
 }
 
 export const ChatModal: React.FC<ChatModalProps> = ({ booking, isOpen, onClose }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import {
   Home,
@@ -30,6 +31,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onChangeTab
 }) => {
   const { user, currentRole } = useAuth();
+  const { t } = useTranslation();
   const effectiveRole = role || user?.role || currentRole || 'customer';
 
   const handleSelectTab = (tabId: string) => {
@@ -45,30 +47,30 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     switch (effectiveRole) {
       case 'barber':
         return [
-          { id: 'dashboard', label: 'Home', icon: <LayoutDashboard className="h-5 w-5" /> },
-          { id: 'requests', label: 'Requests', icon: <Inbox className="h-5 w-5" /> },
-          { id: 'calendar', label: 'Schedule', icon: <Calendar className="h-5 w-5" /> },
-          { id: 'earnings', label: 'Earnings', icon: <DollarSign className="h-5 w-5" /> },
-          { id: 'profile', label: 'Profile', icon: <UserCheck className="h-5 w-5" /> }
+          { id: 'dashboard', label: t('tabDashboard'), icon: <LayoutDashboard className="h-5 w-5" /> },
+          { id: 'requests', label: t('tabRequests'), icon: <Inbox className="h-5 w-5" /> },
+          { id: 'calendar', label: t('tabCalendar'), icon: <Calendar className="h-5 w-5" /> },
+          { id: 'earnings', label: t('tabEarnings'), icon: <DollarSign className="h-5 w-5" /> },
+          { id: 'profile', label: t('tabProfile'), icon: <UserCheck className="h-5 w-5" /> }
         ];
 
       case 'admin':
         return [
-          { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
-          { id: 'verifications', label: 'Barbers', icon: <FileCheck2 className="h-5 w-5" /> },
-          { id: 'bookings', label: 'Bookings', icon: <Calendar className="h-5 w-5" /> },
-          { id: 'payments', label: 'Payments', icon: <CreditCard className="h-5 w-5" /> },
-          { id: 'disputes', label: 'Disputes', icon: <AlertCircle className="h-5 w-5" /> },
-          { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> }
+          { id: 'overview', label: t('tabAdminOverview'), icon: <LayoutDashboard className="h-5 w-5" /> },
+          { id: 'verifications', label: t('tabAdminVerifications'), icon: <FileCheck2 className="h-5 w-5" /> },
+          { id: 'bookings', label: t('tabBookings'), icon: <Calendar className="h-5 w-5" /> },
+          { id: 'payments', label: t('tabAdminPayments'), icon: <CreditCard className="h-5 w-5" /> },
+          { id: 'disputes', label: t('tabAdminDisputes'), icon: <AlertCircle className="h-5 w-5" /> },
+          { id: 'settings', label: t('tabAdminSettings'), icon: <Settings className="h-5 w-5" /> }
         ];
 
       case 'customer':
       default:
         return [
-          { id: 'explore', label: 'Home', icon: <Home className="h-5 w-5" /> },
-          { id: 'bookings', label: 'Bookings', icon: <Calendar className="h-5 w-5" /> },
-          { id: 'messages', label: 'Messages', icon: <MessageSquare className="h-5 w-5" /> },
-          { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> }
+          { id: 'explore', label: t('tabExplore'), icon: <Home className="h-5 w-5" /> },
+          { id: 'bookings', label: t('tabBookings'), icon: <Calendar className="h-5 w-5" /> },
+          { id: 'messages', label: t('tabMessages'), icon: <MessageSquare className="h-5 w-5" /> },
+          { id: 'profile', label: t('tabProfile'), icon: <User className="h-5 w-5" /> }
         ];
     }
   };

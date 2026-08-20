@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { Navigation, Scissors, ShieldCheck, MapPin, ZoomIn, ZoomOut, Compass } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -37,6 +38,8 @@ export const LiveMap: React.FC<LiveMapProps> = ({
   selectedBarberId,
   className = 'h-96'
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [zoomLevel, setZoomLevel] = useState(1);
   const [hoveredBarber, setHoveredBarber] = useState<string | null>(null);
 

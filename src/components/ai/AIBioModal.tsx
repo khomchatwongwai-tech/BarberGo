@@ -1,3 +1,4 @@
+import { useLanguage, useTranslation } from '../../context/LanguageContext';
 import React, { useState } from 'react';
 import { Sparkles, X, Wand2, Check, Copy, Loader2, Scissors } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -15,6 +16,8 @@ export const AIBioModal: React.FC<AIBioModalProps> = ({
   barberName,
   onApplyBio
 }) => {
+  const { currentLanguage, setLanguage, t } = useLanguage();
+
   const [yearsExp, setYearsExp] = useState(10);
   const [city, setCity] = useState('San Francisco, CA');
   const [specialties, setSpecialties] = useState('Skin Fades, Hot Towel Shaves, Executive Beard Sculpting');
