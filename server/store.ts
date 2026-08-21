@@ -14,8 +14,129 @@ import {
   SafetyReport,
   BookingPricing,
   BookingStatus,
-  StatusHistoryItem
+  StatusHistoryItem,
+  BarberOffer,
+  BarberCalendarDay,
+  BarberCalendarSlot,
+  AppSubscriptionPlan,
+  UserSubscription,
+  BillingInvoice,
+  BillingEvent,
+  SubscriptionPlanId,
+  BillingInterval
 } from '../src/types';
+
+export const BARBERPILOT_PLATFORM_FEE_RATE = 0.05; // Authoritative 5% marketplace transaction fee
+
+export const BARBER_SUBSCRIPTION_PLANS: AppSubscriptionPlan[] = [
+  {
+    id: 'solo' as any,
+    name: 'Solo',
+    tagline: 'Essential mobile barber business kit',
+    pricePerMonth: 19.99,
+    pricePerYear: 199.90,
+    trialDays: 14,
+    isPopular: false,
+    description: 'Great for independent barbers getting started with on-demand mobile bookings.',
+    features: [
+      'Up to 35 customer booking opportunities / month',
+      'Standard marketplace smart match ranking',
+      '1 Primary service travel radius',
+      'Direct Stripe Connect bank payouts',
+      'In-app client messaging & style notes'
+    ],
+    featureList: [
+      { text: '35 customer opportunities / mo', included: true },
+      { text: 'Standard search & map ranking', included: true },
+      { text: '1 Primary service area radius', included: true },
+      { text: 'Direct Stripe Connect payouts', included: true },
+      { text: '14-Day Free Trial included', included: true },
+      { text: 'Priority dispatch boost', included: false },
+      { text: 'AI Demand Forecasting & Bio Writer', included: false }
+    ],
+    limits: {
+      aiConsultationsPerMonth: 5,
+      bookingDiscountPercent: 0,
+      platformFeeWaiver: false,
+      priorityDispatch: false,
+      vipSupport: false,
+      directBarberLine: true,
+      barberMonthlyBookings: 35
+    }
+  },
+  {
+    id: 'growth' as any,
+    name: 'Growth',
+    tagline: 'Accelerate your client base and booking volume',
+    pricePerMonth: 49.99,
+    pricePerYear: 479.90,
+    trialDays: 14,
+    isPopular: true,
+    description: 'Enhanced visibility and client retention tools for busy mobile professionals.',
+    features: [
+      'Up to 100 customer booking opportunities / month',
+      'Enhanced search visibility boost (1.5x)',
+      '3 Service area regions or custom radius',
+      'Verified Pro Master Barber badge',
+      'Repeat & Preferred customer tagging',
+      'Priority dispatch notifications'
+    ],
+    featureList: [
+      { text: '100 customer opportunities / mo', included: true, highlight: true },
+      { text: '1.5x Search & Map Visibility Boost', included: true, highlight: true },
+      { text: '3 Service areas / extended radius', included: true },
+      { text: 'Verified Pro Master Barber badge', included: true },
+      { text: 'Repeat client tagging & fast rebook', included: true },
+      { text: 'Priority dispatch queue', included: true }
+    ],
+    limits: {
+      aiConsultationsPerMonth: 25,
+      bookingDiscountPercent: 0,
+      platformFeeWaiver: false,
+      priorityDispatch: true,
+      vipSupport: false,
+      directBarberLine: true,
+      barberMonthlyBookings: 100
+    }
+  },
+  {
+    id: 'professional' as any,
+    name: 'Professional',
+    tagline: 'Maximum allowable capacity, AI tools & VIP priority',
+    pricePerMonth: 89.99,
+    pricePerYear: 869.90,
+    trialDays: 14,
+    isPopular: false,
+    description: 'Unlimited volume, top-tier search boost, AI business suite, and VIP concierge.',
+    features: [
+      'Unlimited monthly customer opportunities',
+      'Maximum marketplace visibility boost (3x)',
+      'Unlimited service areas & extended-distance routing',
+      'Elite Master Barber gold badge',
+      'AI Demand Forecasting, Bio & Service description generator',
+      'VIP concierge line & instant payouts'
+    ],
+    featureList: [
+      { text: 'Unlimited customer booking opportunities', included: true, highlight: true },
+      { text: 'Maximum 3x Marketplace Search Boost', included: true, highlight: true },
+      { text: 'Unlimited service travel areas', included: true },
+      { text: 'Elite Master Barber Gold Badge', included: true },
+      { text: 'AI Business Suite & Bio Optimizer', included: true },
+      { text: '24/7 VIP dedicated support & Instant Payouts', included: true }
+    ],
+    limits: {
+      aiConsultationsPerMonth: -1,
+      bookingDiscountPercent: 0,
+      platformFeeWaiver: false,
+      priorityDispatch: true,
+      vipSupport: true,
+      directBarberLine: true,
+      barberMonthlyBookings: null
+    }
+  }
+];
+
+export const APP_SUBSCRIPTION_PLANS: AppSubscriptionPlan[] = BARBER_SUBSCRIPTION_PLANS;
 
 export class DataStore {
   users: Map<string, User> = new Map();
@@ -28,7 +149,11 @@ export class DataStore {
   messages: Map<string, Message[]> = new Map(); // bookingId -> messages
   notifications: Map<string, AppNotification[]> = new Map(); // userId -> notifications
   promoCodes: Map<string, PromoCode> = new Map();
+  offers: Map<string, BarberOffer> = new Map(); // offerId -> BarberOffer
   safetyReports: Map<string, SafetyReport> = new Map();
+  subscriptions: Map<string, UserSubscription> = new Map(); // userId -> UserSubscription
+  invoices: Map<string, BillingInvoice[]> = new Map(); // userId -> BillingInvoice[]
+  billingEvents: BillingEvent[] = [];
   auditLogs: AuditLog[] = [];
   settings: PlatformSettings;
 
@@ -38,10 +163,10 @@ export class DataStore {
       logoText: 'BarberPilot',
       tagline: 'Master Barbers Delivered to Your Door',
       primaryColor: '#0F172A',
-      accentColor: '#D97706', // Premium warm gold
-      platformFeePercent: 6.0,
-      minPlatformFee: 1.99,
-      maxPlatformFee: 12.99,
+      accentColor: '#0284C7', // Sky 600
+      platformFeePercent: 5.0, // Canonical 5% marketplace fee
+      minPlatformFee: 1.00,
+      maxPlatformFee: 15.00,
       taxRatePercent: 8.5,
       cancellationCutoffHours: 24,
       lateCancellationFeePercent: 50,
@@ -61,46 +186,48 @@ export class DataStore {
       stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.includes('...')),
       subscriptionPlans: [
         {
-          id: 'starter',
-          name: 'Starter',
+          id: 'solo',
+          name: 'Solo Tier',
           pricePerMonth: 19.99,
-          bookingLimit: 20,
-          description: 'Low monthly price with basic marketplace access.',
+          bookingLimit: 35,
+          description: 'Essential mobile barber business kit for independent mobile barbers.',
           features: [
-            'Up to 20 completed bookings/mo',
-            'Standard search visibility',
-            'Stripe Direct Payouts',
-            'Client in-app messaging'
+            'Up to 35 customer opportunities / month',
+            'Standard marketplace match ranking',
+            '1 Primary service travel radius',
+            'Direct Stripe Connect payouts',
+            'In-app client messaging & style notes'
           ]
         },
         {
-          id: 'pro',
-          name: 'Pro',
+          id: 'growth',
+          name: 'Growth Tier (Most Popular)',
           pricePerMonth: 49.99,
-          bookingLimit: 75,
-          description: 'More booking visibility, advanced analytics, and lower platform fee.',
+          bookingLimit: 100,
+          isPopular: true,
+          description: 'Enhanced visibility and client retention tools for busy mobile professionals.',
           features: [
-            'Up to 75 completed bookings/mo',
-            'Priority map placement',
-            'Advanced calendar sync',
-            'AI Profile & Service Writer',
-            'Instant Payout capability',
-            'Lower platform transaction fee'
+            'Up to 100 customer opportunities / month',
+            'Enhanced search visibility boost (1.5x)',
+            '3 Service area regions or custom radius',
+            'Verified Pro Master Barber badge',
+            'Repeat & Preferred customer tagging',
+            'Priority dispatch notifications'
           ]
         },
         {
-          id: 'elite',
-          name: 'Elite',
+          id: 'professional',
+          name: 'Professional Tier',
           pricePerMonth: 89.99,
           bookingLimit: null, // Unlimited
-          description: 'Highest visibility, advanced AI business tools, priority support, and lowest fee.',
+          description: 'Unlimited volume, maximum visibility boost, and AI business tools.',
           features: [
-            'Unlimited monthly bookings',
-            'Highest search ranking & Elite badge',
-            'Advanced AI business tools',
-            'Priority 24/7 dedicated support',
-            'Lowest platform transaction fee',
-            'Comprehensive tax & revenue export'
+            'Unlimited monthly customer opportunities',
+            'Maximum marketplace visibility boost (3x)',
+            'Unlimited service areas & extended routing',
+            'Elite Master Barber gold badge',
+            'AI Demand Forecasting & Bio Optimizer',
+            'VIP concierge line & instant payouts'
           ]
         }
       ]
@@ -957,6 +1084,355 @@ export class DataStore {
         timestamp: '2025-01-15T09:00:00Z'
       }
     );
+
+    // 12. Seed Live Barber Broadcast Offers
+    const offer1: BarberOffer = {
+      id: 'offer-1',
+      barberId: 'barber-1',
+      barberName: 'Devon "Blade" Carter',
+      barberAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+      barberRating: 4.98,
+      barberSpecialties: ['Skin Fade', 'Beard Sculpt', 'Hot Towel'],
+      title: '⚡ Flash Opening: $20 OFF Signature Skin Fade in SOMA / FiDi',
+      description: 'Mobile van is currently parked on Mission St with zero-gap clippers & hot steam towels ready. Available for immediate dispatch to your home or office!',
+      serviceCategory: 'Fade',
+      serviceName: 'Signature Precision Skin & Taper Fade',
+      originalPrice: 75.0,
+      discountedPrice: 55.0,
+      discountPercentage: 27,
+      availableTimeWindow: 'Today • 2:30 PM – 5:30 PM',
+      locationArea: 'Downtown SF, SOMA & FiDi (within 8 miles)',
+      expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+      isClaimed: false,
+      createdAt: new Date().toISOString(),
+      tags: ['⚡ Flash Deal', '🚗 Free Travel Included', '🧴 Free Tea Tree Scalp Rinse']
+    };
+
+    const offer2: BarberOffer = {
+      id: 'offer-2',
+      barberId: 'barber-2',
+      barberName: 'Sofia Reyes',
+      barberAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+      barberRating: 5.0,
+      barberSpecialties: ['Precision Scissor Cut', 'Luxe Beard', 'Hair Mask'],
+      title: '✨ Penthouse Luxe Combo: $30 OFF in Marina / Pacific Heights',
+      description: 'Full luxury experience: Scissor cut + Beard sculpting + Scalp rejuvenation with Dyson Supersonic finish.',
+      serviceCategory: 'VIP Combo',
+      serviceName: 'Penthouse Luxe Grooming Experience',
+      originalPrice: 150.0,
+      discountedPrice: 120.0,
+      discountPercentage: 20,
+      availableTimeWindow: 'Today • 4:00 PM – 8:00 PM',
+      locationArea: 'Marina, Pacific Heights & Nob Hill',
+      expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+      isClaimed: false,
+      createdAt: new Date().toISOString(),
+      tags: ['👑 VIP Experience', '✂️ Master Scissor Cut', '💆 Argan Oil Scalp Mask']
+    };
+
+    const offer3: BarberOffer = {
+      id: 'offer-3',
+      barberId: 'barber-3',
+      barberName: 'Jamal Williams',
+      barberAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
+      barberRating: 4.92,
+      barberSpecialties: ['Sharp Lineup', 'Beard Contour', 'Razor Edge'],
+      title: '🔥 Early Evening Special: Classic Taper + Crisp Razor Lineup $50',
+      description: 'Razor sharp lines, clean taper, and organic bay rum splash. Mobile station sanitized between appointments.',
+      serviceCategory: 'Haircut',
+      serviceName: 'Classic Mobile Taper & Lineup',
+      originalPrice: 65.0,
+      discountedPrice: 50.0,
+      discountPercentage: 23,
+      availableTimeWindow: 'Tonight • 6:00 PM – 9:30 PM',
+      locationArea: 'Mission, Castro & Potrero Hill',
+      expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+      isClaimed: false,
+      createdAt: new Date().toISOString(),
+      tags: ['🔥 Evening Slot', '🪒 Straight Razor Lineup', '⭐️ 4.92 Rated']
+    };
+
+    this.offers.set(offer1.id, offer1);
+    this.offers.set(offer2.id, offer2);
+    this.offers.set(offer3.id, offer3);
+
+    // 13. Seed Subscriptions & Invoices
+    const nowIso = new Date().toISOString();
+    const trialEndIso = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const periodEndIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const customerSubscription: UserSubscription = {
+      id: 'sub-cust-1',
+      userId: 'cust-1',
+      planId: 'pro',
+      status: 'active',
+      billingInterval: 'month',
+      amount: 19.99,
+      currency: 'USD',
+      trialStartDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      trialEndDate: trialEndIso,
+      currentPeriodStart: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      currentPeriodEnd: periodEndIso,
+      cancelAtPeriodEnd: false,
+      stripeCustomerId: 'cus_demo_cust1_8892',
+      stripeSubscriptionId: 'sub_demo_pro_1102',
+      paymentMethod: {
+        brand: 'Visa',
+        last4: '4242',
+        expMonth: 12,
+        expYear: 2028
+      },
+      usageThisCycle: {
+        aiConsultationsUsed: 3,
+        bookingsCompleted: 2,
+        discountsSaved: 23.50
+      },
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: nowIso
+    };
+    this.subscriptions.set('cust-1', customerSubscription);
+
+    // Invoices for cust-1
+    this.invoices.set('cust-1', [
+      {
+        id: 'inv-1002',
+        userId: 'cust-1',
+        subscriptionId: 'sub-cust-1',
+        invoiceNumber: 'INV-2026-00981',
+        amount: 19.99,
+        currency: 'USD',
+        status: 'paid',
+        planName: 'Pro Membership',
+        billingInterval: 'month',
+        date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        periodStart: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        periodEnd: periodEndIso,
+        pdfUrl: '#',
+        receiptUrl: '#',
+        paymentMethod: { brand: 'Visa', last4: '4242' }
+      },
+      {
+        id: 'inv-1001',
+        userId: 'cust-1',
+        subscriptionId: 'sub-cust-1',
+        invoiceNumber: 'INV-2026-00412',
+        amount: 19.99,
+        currency: 'USD',
+        status: 'paid',
+        planName: 'Pro Membership',
+        billingInterval: 'month',
+        date: new Date(Date.now() - 37 * 24 * 60 * 60 * 1000).toISOString(),
+        periodStart: new Date(Date.now() - 37 * 24 * 60 * 60 * 1000).toISOString(),
+        periodEnd: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        pdfUrl: '#',
+        receiptUrl: '#',
+        paymentMethod: { brand: 'Visa', last4: '4242' }
+      }
+    ]);
+
+    // Initial billing events
+    this.billingEvents.push(
+      {
+        id: 'evt-1',
+        userId: 'cust-1',
+        type: 'customer.subscription.created',
+        amount: 19.99,
+        currency: 'USD',
+        status: 'success',
+        data: { plan: 'pro', interval: 'month' },
+        createdAt: new Date(Date.now() - 37 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'evt-2',
+        userId: 'cust-1',
+        type: 'invoice.paid',
+        amount: 19.99,
+        currency: 'USD',
+        status: 'success',
+        data: { invoiceNumber: 'INV-2026-00981' },
+        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    );
+  }
+
+  // --- Subscription & Billing Helpers ---
+  getUserSubscription(userId: string): UserSubscription {
+    let sub = this.subscriptions.get(userId);
+    if (!sub) {
+      // Default to free tier
+      const now = new Date().toISOString();
+      const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      sub = {
+        id: `sub-free-${userId}`,
+        userId,
+        planId: 'free',
+        status: 'active',
+        billingInterval: 'month',
+        amount: 0,
+        currency: 'USD',
+        currentPeriodStart: now,
+        currentPeriodEnd: nextMonth,
+        cancelAtPeriodEnd: false,
+        usageThisCycle: {
+          aiConsultationsUsed: 0,
+          bookingsCompleted: 0,
+          discountsSaved: 0
+        },
+        createdAt: now,
+        updatedAt: now
+      };
+      this.subscriptions.set(userId, sub);
+    }
+    return sub;
+  }
+
+  getInvoices(userId: string): BillingInvoice[] {
+    return this.invoices.get(userId) || [];
+  }
+
+  addInvoice(userId: string, invoice: BillingInvoice): void {
+    const list = this.invoices.get(userId) || [];
+    list.unshift(invoice);
+    this.invoices.set(userId, list);
+  }
+
+  recordBillingEvent(event: Omit<BillingEvent, 'id' | 'createdAt'>): BillingEvent {
+    const fullEvent: BillingEvent = {
+      ...event,
+      id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString()
+    };
+    this.billingEvents.unshift(fullEvent);
+    return fullEvent;
+  }
+
+  // --- Broadcast Offers Helpers ---
+  getOffers(activeOnly: boolean = true): BarberOffer[] {
+    const all = Array.from(this.offers.values());
+    if (!activeOnly) return all;
+    const now = Date.now();
+    return all.filter((o) => !o.isClaimed && new Date(o.expiresAt).getTime() > now);
+  }
+
+  createOffer(data: Omit<BarberOffer, 'id' | 'createdAt' | 'isClaimed'>): BarberOffer {
+    const id = `offer-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const newOffer: BarberOffer = {
+      ...data,
+      id,
+      isClaimed: false,
+      createdAt: new Date().toISOString()
+    };
+    this.offers.set(id, newOffer);
+    return newOffer;
+  }
+
+  claimOffer(offerId: string, customerId: string): BarberOffer | null {
+    const offer = this.offers.get(offerId);
+    if (!offer || offer.isClaimed) return null;
+    offer.isClaimed = true;
+    offer.claimedByCustomerId = customerId;
+    return offer;
+  }
+
+  deleteOffer(offerId: string, barberId: string): boolean {
+    const offer = this.offers.get(offerId);
+    if (!offer || (offer.barberId !== barberId && barberId !== 'admin-1')) return false;
+    return this.offers.delete(offerId);
+  }
+
+  // --- Barber Calendar & Availability Calculations ---
+  getBarberCalendar(barberId: string, daysAhead: number = 14): BarberCalendarDay[] {
+    const availability = this.availabilities.get(barberId);
+    const barberBookings = Array.from(this.bookings.values()).filter(
+      (b) => b.barberId === barberId && b.status !== 'cancelled' && b.status !== 'declined'
+    );
+
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+    const result: BarberCalendarDay[] = [];
+
+    const now = new Date();
+
+    for (let i = 0; i < daysAhead; i++) {
+      const targetDate = new Date(now);
+      targetDate.setDate(now.getDate() + i);
+      const dateStr = targetDate.toISOString().split('T')[0];
+      const dayIndex = targetDate.getDay();
+      const dayName = dayNames[dayIndex];
+
+      const dayConfig = availability?.weeklySchedule?.[dayName] || { enabled: true, start: '09:00', end: '18:00', slots: [{ start: '09:00', end: '18:00' }] };
+      const isBlocked = (availability?.unavailableDates || []).includes(dateStr);
+      const isWorkingDay = dayConfig.enabled && !isBlocked;
+
+      const slots: BarberCalendarSlot[] = [];
+
+      if (isWorkingDay) {
+        // Parse start and end hours
+        const startTimeStr = (dayConfig.slots && dayConfig.slots[0]?.start) || dayConfig.start || '09:00';
+        const endTimeStr = (dayConfig.slots && dayConfig.slots[dayConfig.slots.length - 1]?.end) || dayConfig.end || '18:00';
+
+        const [startH, startM] = startTimeStr.split(':').map(Number);
+        const [endH, endM] = endTimeStr.split(':').map(Number);
+
+        const startMinutes = (isNaN(startH) ? 9 : startH) * 60 + (isNaN(startM) ? 0 : startM);
+        const endMinutes = (isNaN(endH) ? 18 : endH) * 60 + (isNaN(endM) ? 0 : endM);
+        const step = 60; // 60-minute appointment slots
+
+        let idx = 0;
+        for (let m = startMinutes; m <= endMinutes - 45; m += step) {
+          const hour = Math.floor(m / 60);
+          const min = m % 60;
+          const period = hour >= 12 ? 'PM' : 'AM';
+          const displayH = hour % 12 === 0 ? 12 : hour % 12;
+          const displayHStr = displayH < 10 ? `0${displayH}` : `${displayH}`;
+          const displayMStr = min < 10 ? `0${min}` : `${min}`;
+          const tStr = `${displayHStr}:${displayMStr} ${period}`;
+          const militaryStr = `${hour.toString().padStart(2, '0')}:${displayMStr}`;
+
+          // Check if break
+          const isBreak = (availability?.breaks || []).some(
+            (br) => militaryStr >= br.start && militaryStr < br.end
+          ) || (tStr === '01:00 PM' && (availability?.breaks?.length ?? 0) > 0);
+
+          // Check if booked
+          const matchedBooking = barberBookings.find(
+            (b) => b.date === dateStr && (
+              b.time === tStr ||
+              b.time.includes(tStr.replace(' AM', '').replace(' PM', '')) ||
+              b.time.toLowerCase().includes(tStr.toLowerCase()) ||
+              b.time === militaryStr
+            )
+          );
+
+          const isBooked = Boolean(matchedBooking);
+          const isAvailable = !isBreak && !isBooked && !isBlocked;
+
+          slots.push({
+            id: `slot-${dateStr}-${idx}`,
+            time: tStr,
+            isoDateTime: `${dateStr}T${tStr}`,
+            isAvailable,
+            isBooked,
+            isBreak,
+            isBlocked,
+            bookingId: matchedBooking?.id,
+            customerName: matchedBooking?.customerName,
+            serviceName: matchedBooking?.service?.name,
+            location: matchedBooking?.address?.street
+          });
+          idx++;
+        }
+      }
+
+      result.push({
+        date: dateStr,
+        dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
+        isWorkingDay,
+        isBlocked,
+        slots
+      });
+    }
+
+    return result;
   }
 
   // Calculation helpers
@@ -972,14 +1448,10 @@ export class DataStore {
     const subtotal = servicePrice + addOnsPrice;
     const travelFee = Math.round((barberBaseTravelFee + travelDistanceMiles * barberTravelFeePerMile) * 100) / 100;
     
-    // Platform fee calculation based on configurable admin rules
-    const rawFee = subtotal * (this.settings.platformFeePercent / 100);
-    const platformFee = Math.min(
-      this.settings.maxPlatformFee,
-      Math.max(this.settings.minPlatformFee, Math.round(rawFee * 100) / 100)
-    );
+    // Canonical BarberPilot 5% platform marketplace fee calculated server-side
+    const platformFee = Math.round(subtotal * BARBERPILOT_PLATFORM_FEE_RATE * 100) / 100;
 
-    // Estimated tax
+    // Estimated local sales tax (8.5% on taxable services and travel surcharge)
     const estimatedTax = Math.round((subtotal + travelFee) * (this.settings.taxRatePercent / 100) * 100) / 100;
 
     // Promo code discount
@@ -999,10 +1471,10 @@ export class DataStore {
 
     const finalTotal = Math.max(0, Math.round((subtotal + travelFee + platformFee + estimatedTax - discount + tipAmount) * 100) / 100);
 
-    // Barber Earnings: 100% of service + 100% of addons + 100% of travel fee + 100% of tips
-    const barberGross = subtotal + travelFee + tipAmount;
+    // Barber Earnings: 95% of service subtotal (after 5% BarberPilot fee) + 100% of travel fee + 100% of tips
+    const barberServiceRevenue = Math.round(subtotal * (1 - BARBERPILOT_PLATFORM_FEE_RATE) * 100) / 100;
+    const netPayout = Math.max(0, Math.round((barberServiceRevenue + travelFee + tipAmount) * 100) / 100);
     const stripeFeeEstimate = Math.round((finalTotal * 0.029 + 0.30) * 100) / 100;
-    const netPayout = Math.max(0, Math.round((barberGross - (barberGross > 100 ? 2.50 : 1.50)) * 100) / 100);
 
     return {
       servicePrice,
@@ -1012,6 +1484,7 @@ export class DataStore {
       estimatedTax,
       discount,
       tip: tipAmount,
+      total: finalTotal,
       finalTotal,
       barberEarnings: {
         serviceRevenue: servicePrice,

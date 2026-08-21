@@ -13,10 +13,10 @@ const defaultSettings: PlatformSettings = {
   logoText: 'BarberPilot',
   tagline: 'Master Barbers Delivered to Your Door',
   primaryColor: '#0F172A',
-  accentColor: '#D97706',
-  platformFeePercent: 6.0,
-  minPlatformFee: 1.99,
-  maxPlatformFee: 12.99,
+  accentColor: '#0284C7',
+  platformFeePercent: 5.0,
+  minPlatformFee: 1.00,
+  maxPlatformFee: 15.00,
   taxRatePercent: 8.5,
   cancellationCutoffHours: 24,
   lateCancellationFeePercent: 50,
@@ -37,17 +37,18 @@ const defaultSettings: PlatformSettings = {
       id: 'solo',
       name: 'Solo Tier',
       pricePerMonth: 19.99,
-      bookingLimit: 20,
-      description: 'Perfect for part-time or starter mobile barbers.',
-      features: ['Up to 20 completed bookings/mo', 'Standard search visibility', 'Stripe Direct Payouts', 'In-app messaging']
+      bookingLimit: 35,
+      description: 'Essential mobile barber business kit for independent mobile barbers.',
+      features: ['Up to 35 completed bookings/mo', 'Standard search visibility', 'Stripe Direct Payouts', 'In-app messaging']
     },
     {
       id: 'growth',
       name: 'Growth Tier',
       pricePerMonth: 49.99,
-      bookingLimit: 75,
+      bookingLimit: 100,
+      isPopular: true,
       description: 'Best for active full-time mobile barbers growing clientele.',
-      features: ['Up to 75 completed bookings/mo', 'Priority map placement', 'Advanced calendar sync', 'AI Profile & Service Writer', 'Instant Payout capability']
+      features: ['Up to 100 completed bookings/mo', '1.5x Priority map placement', 'Advanced calendar sync', 'AI Profile & Service Writer', 'Instant Payout capability']
     },
     {
       id: 'professional',
@@ -55,7 +56,7 @@ const defaultSettings: PlatformSettings = {
       pricePerMonth: 89.99,
       bookingLimit: null,
       description: 'Unlimited volume with premium analytics & VIP badge.',
-      features: ['Unlimited monthly bookings', 'Top badge & VIP search ranking', 'Dedicated 24/7 priority support', 'Custom marketing tools & SMS blasts', 'Comprehensive tax & revenue export']
+      features: ['Unlimited monthly bookings', '3x Top badge & VIP search ranking', 'Dedicated 24/7 priority support', 'Custom marketing tools & SMS blasts', 'Comprehensive tax & revenue export']
     }
   ]
 };

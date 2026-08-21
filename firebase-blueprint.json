@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Base authenticated user profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "fullName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["customer", "barber", "admin", "support"] },
+        "avatarUrl": { "type": "string", "maxLength": 1024 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "email", "fullName", "role"]
+    },
+    "CustomerProfile": {
+      "title": "CustomerProfile",
+      "description": "Customer specific preferences, notes, and addresses",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "defaultPaymentMethod": { "type": "string", "maxLength": 100 },
+        "hairType": { "type": "string", "maxLength": 50 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "savedAddresses": { "type": "array" },
+        "favoriteBarberIds": { "type": "array" }
+      },
+      "required": ["userId"]
+    },
+    "BarberProfile": {
+      "title": "BarberProfile",
+      "description": "Barber freelancer profile with licensing, rates, and travel radius",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "bio": { "type": "string", "maxLength": 2000 },
+        "experienceYears": { "type": "number" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "completedBookingsCount": { "type": "number" },
+        "travelRadiusMiles": { "type": "number" },
+        "baseTravelFee": { "type": "number" },
+        "travelFeePerMile": { "type": "number" },
+        "serviceAreaCities": { "type": "array" },
+        "portfolioImages": { "type": "array" },
+        "idVerified": { "type": "boolean" },
+        "licenseStatus": { "type": "string", "enum": ["verified", "pending", "rejected"] },
+        "isAcceptingBookings": { "type": "boolean" },
+        "subscriptionTier": { "type": "string", "enum": ["starter", "pro", "elite"] },
+        "coordinates": { "type": "object" }
+      },
+      "required": ["userId", "rating", "travelRadiusMiles"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Appointment booking between customer and mobile barber",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 120 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "barberId": { "type": "string", "maxLength": 128 },
+        "barberName": { "type": "string", "maxLength": 120 },
+        "barberAvatar": { "type": "string", "maxLength": 1024 },
+        "service": { "type": "object" },
+        "address": { "type": "object" },
+        "date": { "type": "string", "maxLength": 30 },
+        "time": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["requested", "accepted", "en_route", "arrived", "in_progress", "completed", "cancelled", "disputed"] },
+        "pricing": { "type": "object" },
+        "consultationNotes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "customerId", "barberId", "status", "pricing"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Direct communication message between customer and barber",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "bookingId": { "type": "string", "maxLength": 128 },
+        "senderId": { "type": "string", "maxLength": 128 },
+        "receiverId": { "type": "string", "maxLength": 128 },
+        "text": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "bookingId", "senderId", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles"
+    },
+    "/customerProfiles/{userId}": {
+      "schema": { "$ref": "CustomerProfile" },
+      "description": "Customer specific profiles and preferences"
+    },
+    "/barberProfiles/{userId}": {
+      "schema": { "$ref": "BarberProfile" },
+      "description": "Freelance barber provider profiles"
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "Booking" },
+      "description": "Barber appointments and service requests"
+    },
+    "/bookings/{bookingId}/messages/{messageId}": {
+      "schema": { "$ref": "Message" },
+      "description": "Appointment arrival coordination and style messages"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common security helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Connection test document
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isOwner(userId) && incoming().id == userId;
+      allow update: if isOwner(userId) && incoming().id == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    // Customer Profiles
+    match /customerProfiles/{userId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    // Barber Profiles
+    match /barberProfiles/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    // Bookings
+    match /bookings/{bookingId} {
+      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.barberId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.barberId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().customerId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.customerId == request.auth.uid || resource.data.barberId == request.auth.uid);
+      allow delete: if isSignedIn() && resource.data.customerId == request.auth.uid;
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && incoming().senderId == request.auth.uid;
+      }
+    }
+  }
+}
