@@ -1,0 +1,6 @@
+{
+  "name": "BarberGo with Workqora",
+  "repositoryDependencies": [
+    "github.com/khomchatwongwai-tech/workqora"
+  ]
+}
