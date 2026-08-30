@@ -8,6 +8,8 @@
  * with row-level security; this class is the seam where that swaps in.
  */
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import type { UniversalDocument } from '../ingestion/ingestionContracts';
 import type { ClassificationResult } from '../classification/documentClassifier';
 import type { EntityResolution, CanonicalEmployee } from '../entities/entityContracts';
@@ -63,17 +65,71 @@ export interface DocumentDetail {
   links: DocumentLinkRecord[];
 }
 
+const STATE_VERSION = 1;
+const DEFAULT_STATE_FILE = path.join(process.cwd(), '.workqora-storage', 'state', 'intelligence-state.json');
+
+interface PersistedState {
+  version: number;
+  documents: [string, DocumentDetail][];
+  idempotency: [string, string][];
+  employees: [string, CanonicalEmployee][];
+}
+
 export class IntelligenceStore {
   private documents = new Map<string, DocumentDetail>();
   /** idempotencyKey -> documentId, for dedupe. */
   private idempotencyIndex = new Map<string, string>();
   private employees = new Map<string, CanonicalEmployee>();
 
+  /**
+   * Optional durable write-through persistence. Enabled unless
+   * WORKQORA_PERSIST=off (tests set this). This is the seam a Supabase / Firestore
+   * implementation replaces; until then, state survives server restarts on disk.
+   */
+  private persistEnabled: boolean;
+  private stateFile: string;
+
+  constructor(options?: { stateFile?: string; persist?: boolean }) {
+    this.persistEnabled = options?.persist ?? process.env.WORKQORA_PERSIST !== 'off';
+    this.stateFile = options?.stateFile ?? process.env.WORKQORA_STATE_FILE ?? DEFAULT_STATE_FILE;
+    if (this.persistEnabled) this.load();
+  }
+
+  private load(): void {
+    try {
+      if (!existsSync(this.stateFile)) return;
+      const parsed = JSON.parse(readFileSync(this.stateFile, 'utf8')) as PersistedState;
+      if (!parsed || parsed.version !== STATE_VERSION) return;
+      this.documents = new Map(parsed.documents ?? []);
+      this.idempotencyIndex = new Map(parsed.idempotency ?? []);
+      this.employees = new Map(parsed.employees ?? []);
+    } catch (err) {
+      console.error('[intelligence-store] failed to load persisted state:', err);
+    }
+  }
+
+  private save(): void {
+    if (!this.persistEnabled) return;
+    try {
+      const state: PersistedState = {
+        version: STATE_VERSION,
+        documents: [...this.documents.entries()],
+        idempotency: [...this.idempotencyIndex.entries()],
+        employees: [...this.employees.entries()],
+      };
+      mkdirSync(path.dirname(this.stateFile), { recursive: true });
+      writeFileSync(this.stateFile, JSON.stringify(state), 'utf8');
+    } catch (err) {
+      console.error('[intelligence-store] failed to persist state:', err);
+    }
+  }
+
   // -- Documents -----------------------------------------------------------
 
   putDocument(detail: DocumentDetail): void {
     this.documents.set(detail.document.documentId, detail);
     this.idempotencyIndex.set(detail.idempotencyKey, detail.document.documentId);
+    this.save();
   }
 
   getDocument(documentId: string): DocumentDetail | undefined {
@@ -106,11 +162,15 @@ export class IntelligenceStore {
 
   upsertEmployee(emp: CanonicalEmployee): void {
     this.employees.set(emp.id, emp);
+    this.save();
   }
 
   // -- Test / reset helpers ------------------------------------------------
 
   reset(): void {
+    // Tests use reset(); disable persistence so they never touch the real state
+    // file, and clear in-memory state.
+    this.persistEnabled = false;
     this.documents.clear();
     this.idempotencyIndex.clear();
     this.employees.clear();
