@@ -115,6 +115,26 @@ export const AdminOverview: React.FC<{ onNavigate: (tab: string) => void }> = ({
         </div>
       </div>
 
+      {/* Universal File Intelligence entry point */}
+      <div
+        onClick={() => onNavigate('file_intelligence')}
+        className="rounded-3xl border border-sky-500/30 bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-slate-900 p-5 cursor-pointer hover:border-sky-400 transition-all flex items-center justify-between"
+        id="admin-nav-file-intelligence"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white">
+            <Layers className="h-6 w-6" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-white">Universal File Intelligence</h4>
+            <p className="text-xs text-slate-400">
+              Drop a PDF, Excel, CSV or photo — auto-extract, classify, resolve entities & import into Workqora
+            </p>
+          </div>
+        </div>
+        <ArrowUpRight className="h-5 w-5 text-sky-400" />
+      </div>
+
       {/* Action Banners for Review Queue and Disputes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div

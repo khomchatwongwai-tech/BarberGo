@@ -30,6 +30,7 @@ import { AdminDisputesView } from './components/admin/AdminDisputesView';
 import { AdminPromoCodesView } from './components/admin/AdminPromoCodesView';
 import { AdminBookingsView } from './components/admin/AdminBookingsView';
 import { AdminPaymentsView } from './components/admin/AdminPaymentsView';
+import { UniversalFileIntelligenceView } from './components/admin/UniversalFileIntelligenceView';
 
 // Support Components
 import { SupportQueueView } from './components/support/SupportQueueView';
@@ -46,7 +47,7 @@ const AppContent: React.FC = () => {
   // Active view tabs
   const [customerTab, setCustomerTab] = useState<'explore' | 'bookings' | 'messages' | 'profile'>('explore');
   const [barberTab, setBarberTab] = useState<'dashboard' | 'requests' | 'calendar' | 'earnings' | 'profile'>('dashboard');
-  const [adminTab, setAdminTab] = useState<'overview' | 'settings' | 'verifications' | 'disputes' | 'promo_codes' | 'bookings' | 'payments'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'settings' | 'verifications' | 'disputes' | 'promo_codes' | 'bookings' | 'payments' | 'file_intelligence'>('overview');
   const [supportTab, setSupportTab] = useState<'queue'>('queue');
 
   // Customer Booking & Barber Modals
@@ -158,6 +159,7 @@ const AppContent: React.FC = () => {
             {adminTab === 'promo_codes' && <AdminPromoCodesView />}
             {adminTab === 'bookings' && <AdminBookingsView />}
             {adminTab === 'payments' && <AdminPaymentsView />}
+            {adminTab === 'file_intelligence' && <UniversalFileIntelligenceView />}
           </>
         )}
 
