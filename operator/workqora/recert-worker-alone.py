@@ -72,6 +72,24 @@ def rest(method: str, path: str, body: dict | None = None, extra: dict | None = 
         return err.code, parsed
 
 
+def live_create_run_is_four_tier() -> tuple[str, bool]:
+    """True when GET /api/health SHA's createRun uses tiers/coreRow, not #279 baseRow."""
+    with urllib.request.urlopen("https://www.workqora.com/api/health", timeout=30) as resp:
+        health = json.loads(resp.read().decode())
+    sha = str(health.get("commitSha") or "").strip()
+    if not sha:
+        return "", False
+    url = (
+        "https://raw.githubusercontent.com/khomchatwongwai-tech/workqora/"
+        f"{sha}/server/workflow/workflowEngine.ts"
+    )
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        source = resp.read().decode()
+    idx = source.find("async function createRun")
+    chunk = source[idx : idx + 4000] if idx >= 0 else ""
+    return sha, ("const tiers" in chunk and "coreRow" in chunk)
+
+
 def openapi_workflow_run_columns() -> list[str]:
     url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/"
     key = os.environ["SUPABASE_SECRET_KEY"]
@@ -101,9 +119,11 @@ def main() -> int:
             return 1
 
     columns = openapi_workflow_run_columns()
-    if "definition_version" not in columns:
+    sha, four_tier = live_create_run_is_four_tier()
+    print("liveSha", sha, "fourTierCreateRun", four_tier)
+    if "definition_version" not in columns and not four_tier:
         print(
-            "SKIP definition_version still missing; live two-step createRun cannot persist runs. "
+            "SKIP definition_version still missing and live createRun is still two-step. "
             "Apply operator/workqora/05-add-run-version-columns.sql or ship four-tier createRun."
         )
         print("columns", columns)
