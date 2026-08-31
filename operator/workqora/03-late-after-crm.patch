@@ -1,4 +1,4 @@
-From bbbd2fd0069261d4e7a501ea2dd9d02a81e8ff5b Mon Sep 17 00:00:00 2001
+From 1baf1cddac0b8af3e3d6c822f65c77dd4db59354 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Sun, 30 Aug 2026 22:31:11 +0000
 Subject: [PATCH] fix(automation): map late and no-show events to notify

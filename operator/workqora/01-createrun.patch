@@ -1,4 +1,4 @@
-From 36b61436a5f222dc656e61063b7c06850f9174c2 Mon Sep 17 00:00:00 2001
+From 78bcb5685047ddf82d855df6795fa60d7e220560 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Mon, 31 Aug 2026 00:21:09 +0000
 Subject: [PATCH] fix(workflow): four-tier createRun when AG version columns

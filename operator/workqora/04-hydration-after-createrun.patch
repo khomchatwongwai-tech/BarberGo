@@ -1,4 +1,4 @@
-From 8643a6d610c323ed33acfff12a92fa0ad2808a8f Mon Sep 17 00:00:00 2001
+From 97a9eeecdfda8a4d2e108c9e0cd53016deaa2012 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Sun, 30 Aug 2026 22:34:53 +0000
 Subject: [PATCH] fix(workflow): hydrate source-row facts before matching and
