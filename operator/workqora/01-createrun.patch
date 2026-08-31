@@ -1,0 +1,378 @@
+diff --git a/scripts/critical-deploy-gate.mjs b/scripts/critical-deploy-gate.mjs
+index 21f6da9..958b3a9 100644
+--- a/scripts/critical-deploy-gate.mjs
++++ b/scripts/critical-deploy-gate.mjs
+@@ -10,6 +10,7 @@ const checks = [
+   ['readiness endpoint', server.includes('app.get("/api/health/ready"')],
+   ['invitation schema contract', contracts.includes('employee_onboarding') && contracts.includes('token_hash')],
+   ['readiness refreshes schema contracts', server.includes('refreshSchemaReadiness')],
++  ['boot refreshes schema contracts for public health', server.slice(server.indexOf('app.listen(PORT')).includes('refreshSchemaReadiness')],
+   ['readiness fails closed when schema blocked', server.includes('schemaHealth.databaseSchema !== "blocked"')],
+   ['production smoke suite exists', smoke.includes('/api/health')],
+   ['smoke does not create production employees', !smoke.includes('POST') || !smoke.includes('/api/workforce/employees')],
+diff --git a/server.ts b/server.ts
+index 2035544..5fb3d90 100644
+--- a/server.ts
++++ b/server.ts
+@@ -88,7 +88,7 @@ import { globalErrorHandler } from "./server/ops/errorHandler.ts";
+ import { handlePublicHealth, handleDeepHealth } from "./server/ops/health.ts";
+ import { mapCanonicalBillingToTrialStatus, trialStatusForReadError } from "./server/billing/trialStatus.ts";
+ 
+-import { refreshSchemaReadiness, sanitizeSchemaReadiness } from "./server/ops/schemaContracts.ts";
++import { getCachedSchemaReadiness, refreshSchemaReadiness, sanitizeSchemaReadiness } from "./server/ops/schemaContracts.ts";
+ import { createChatRouter } from "./server/chatRoutes.ts";
+ import { createSearchRouter } from "./server/searchRoutes.ts";
+ import { createAskWorkqoraRouter } from "./server/ai/ask/askWorkqoraRoutes.ts";
+@@ -2073,7 +2073,16 @@ app.get("/api/platform/audit-logs", requirePlatformAdmin, async (req, res) => {
+ });
+ 
+ // Public Minimal Safe Health Endpoint
+-app.get("/api/health", handlePublicHealth);
++app.get("/api/health", async (req, res) => {
++  if (!getCachedSchemaReadiness()) {
++    try {
++      await refreshSchemaReadiness(typeof getServerSupabase === "function" ? getServerSupabase() : null);
++    } catch {
++      // Leave cache empty; handlePublicHealth reports unknown.
++    }
++  }
++  return handlePublicHealth(req, res);
++});
+ 
+ // Public Safe Diagnostic Health Endpoint (Zero Secret Exposure)
+ app.get("/api/health/config", (_req, res) => {
+@@ -10900,48 +10909,6 @@ app.post("/api/scheduler/trigger-shift-reminders", requireFirebaseUser, requireA
+   }
+ });
+ 
+-// System Health Observability Endpoint
+-app.get("/api/health", async (_req, res) => {
+-  let dbHealthy = false;
+-  try {
+-    const sb = getServerSupabase();
+-    const { data } = await sb.from("organizations").select("id").limit(1);
+-    dbHealthy = Array.isArray(data);
+-  } catch (err) {
+-    dbHealthy = false;
+-  }
+-
+-  const checkConfig = (keyName: string) => {
+-    const val = process.env[keyName];
+-    return val && val.trim().length > 0 ? "CONFIGURED_UNVERIFIED" : "NOT_CONFIGURED";
+-  };
+-
+-  const integrationStatuses = {
+-    googleCalendar: checkConfig("GOOGLE_CALENDAR_CLIENT_ID"),
+-    microsoftCalendar: checkConfig("MICROSOFT_CALENDAR_CLIENT_ID"),
+-    gmail: checkConfig("GMAIL_CLIENT_ID") !== "NOT_CONFIGURED" || checkConfig("SMTP_HOST") !== "NOT_CONFIGURED" ? "CONFIGURED_UNVERIFIED" : "NOT_CONFIGURED",
+-    outlook: checkConfig("OUTLOOK_CLIENT_ID"),
+-    gemini: checkConfig("GEMINI_API_KEY"),
+-    openai: checkConfig("OPENAI_API_KEY"),
+-    anthropic: checkConfig("ANTHROPIC_API_KEY"),
+-    perplexity: checkConfig("PERPLEXITY_API_KEY"),
+-  };
+-
+-  res.json({
+-    status: dbHealthy ? "healthy" : "degraded",
+-    platform: "Workqora Intelligent Workforce & Operations Platform",
+-    domain: "https://www.workqora.com",
+-    timestamp: new Date().toISOString(),
+-    database: {
+-      provider: "Supabase PostgreSQL",
+-      connected: dbHealthy,
+-      status: dbHealthy ? "HEALTHY" : "DEGRADED"
+-    },
+-    integrations: integrationStatuses,
+-    uptimeSeconds: Math.floor(process.uptime()),
+-  });
+-});
+-
+ // Integrations Status Endpoint
+ app.get("/api/integrations/status", (_req, res) => {
+   const getStatus = (envKey: string) => {
+@@ -14572,6 +14539,11 @@ async function startServer() {
+     console.log(`[Workqora] Server running on http://localhost:${PORT}`);
+     console.log(`Google Vision OCR: ${isGoogleVisionConfigured() ? "configured" : "not configured"}`);
+     console.log(`Gemini model: ${process.env.GEMINI_MODEL?.trim() ? "configured" : "not configured"}`);
++    // Public /api/health reads this cache. /api/health/ready is the only other
++    // refresher; Render probes /api/health, so boot must fill the cache or
++    // databaseSchema stays unknown even when contracts are evaluable.
++    const sb = typeof getServerSupabase === "function" ? getServerSupabase() : null;
++    void refreshSchemaReadiness(sb).catch(() => {});
+   });
+ }
+ 
+diff --git a/server/ops/schemaContracts.ts b/server/ops/schemaContracts.ts
+index f16bfeb..52908a1 100644
+--- a/server/ops/schemaContracts.ts
++++ b/server/ops/schemaContracts.ts
+@@ -90,6 +90,30 @@ export const SCHEMA_CONTRACTS: SchemaContract[] = [
+     severity: "blocked",
+     featureAffected: "schedule_scanner",
+   },
++  {
++    id: "workflow_runs_core",
++    table: "workflow_runs",
++    requiredColumns: ["id", "workflow_id", "organization_id", "event_id", "event_type", "status"],
++    minimumMigrations: ["supabase/migrations/20260926000000_workflow_engine_foundation.sql"],
++    severity: "degraded",
++    featureAffected: "workflow",
++  },
++  {
++    id: "workflow_runs_versioning",
++    table: "workflow_runs",
++    requiredColumns: ["definition_version", "workflow_version_id", "state_transitions"],
++    minimumMigrations: ["supabase/migrations/20260943000000_workflow_run_lifecycle_and_versioning.sql"],
++    severity: "degraded",
++    featureAffected: "workflow",
++  },
++  {
++    id: "workflow_runs_correlation",
++    table: "workflow_runs",
++    requiredColumns: ["correlation_id", "causation_id"],
++    minimumMigrations: ["supabase/migrations/20260942000000_workflow_run_correlation_causation.sql"],
++    severity: "degraded",
++    featureAffected: "workflow",
++  },
+ ];
+ 
+ export type ContractEvaluation = {
+diff --git a/server/workflow/workflowEngine.ts b/server/workflow/workflowEngine.ts
+index 173de28..401a105 100644
+--- a/server/workflow/workflowEngine.ts
++++ b/server/workflow/workflowEngine.ts
+@@ -129,7 +129,7 @@ async function createRun(sb: SupabaseClient, workflow: WorkflowDefinitionRow, ev
+     actorId: event.actor?.userId || null,
+   };
+ 
+-  const baseRow = {
++  const coreRow = {
+     id,
+     workflow_id: workflow.id,
+     organization_id: workflow.organization_id,
+@@ -138,44 +138,69 @@ async function createRun(sb: SupabaseClient, workflow: WorkflowDefinitionRow, ev
+     event_type: event.eventType,
+     status: "pending",
+     attempt_count: 0,
++    started_at: now,
++    updated_at: now,
++  };
++  const versionFields = {
+     definition_version: defVersion,
+     workflow_version_id: versionId,
+     state_transitions: [initialTransition],
+-    started_at: now,
+-    updated_at: now,
+   };
+-
+-  const attempt = await sb
+-    .from("workflow_runs")
+-    .insert({
+-      ...baseRow,
+-      correlation_id: event.correlationId || event.id,
+-      causation_id: event.causationId ?? null,
+-    })
+-    .select()
+-    .maybeSingle();
+-
+-  let data = attempt.data;
+-  let error = attempt.error;
+-  if (error && isMissingSchemaError(error)) {
+-    const fallback = await sb.from("workflow_runs").insert(baseRow).select().maybeSingle();
+-    data = fallback.data;
+-    error = fallback.error;
+-  }
+-  if (error) {
+-    if (error.code === "23505") return null;
+-    logWarn("workflow.run_creation_failed", {
+-      organizationId: workflow.organization_id,
+-      errorCategory: error.code || "unknown",
+-      metadata: { workflowId: workflow.id, eventId: event.id, eventType: event.eventType, message: error.message },
+-    });
+-    return null;
++  const correlationFields = {
++    correlation_id: event.correlationId || event.id,
++    causation_id: event.causationId ?? null,
++  };
++  // Production may lack AG version columns, correlation columns, or both.
++  // #279 only retried without correlation columns, so missing definition_version
++  // still created zero runs. Keep trying until a schema-compatible insert succeeds.
++  const tiers = [
++    { ...coreRow, ...versionFields, ...correlationFields },
++    { ...coreRow, ...versionFields },
++    { ...coreRow, ...correlationFields },
++    coreRow,
++  ];
++
++  let lastError: { code?: string; message?: string } | null = null;
++  for (const row of tiers) {
++    const attempt = await sb.from("workflow_runs").insert(row).select().maybeSingle();
++    if (!attempt.error) return attempt.data as WorkflowRunRow;
++    lastError = attempt.error;
++    if (attempt.error.code === "23505") return null;
++    if (!isMissingSchemaError(attempt.error)) break;
+   }
+-  return data as WorkflowRunRow;
++  logWarn("workflow.run_creation_failed", {
++    organizationId: workflow.organization_id,
++    errorCategory: lastError?.code || "unknown",
++    metadata: { workflowId: workflow.id, eventId: event.id, eventType: event.eventType, message: lastError?.message },
++  });
++  return null;
+ }
+ 
++const OPTIONAL_RUN_SCHEMA_KEYS = [
++  "definition_version",
++  "workflow_version_id",
++  "state_transitions",
++  "correlation_id",
++  "causation_id",
++] as const;
++
+ async function updateRun(sb: SupabaseClient, runId: string, patch: Record<string, unknown>): Promise<void> {
+-  await sb.from("workflow_runs").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", runId);
++  let next: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() };
++  for (;;) {
++    const attempt = await sb.from("workflow_runs").update(next).eq("id", runId);
++    if (!attempt.error) return;
++    if (!isMissingSchemaError(attempt.error)) return;
++    let stripped = false;
++    const reduced: Record<string, unknown> = { ...next };
++    for (const key of OPTIONAL_RUN_SCHEMA_KEYS) {
++      if (key in reduced) {
++        delete reduced[key];
++        stripped = true;
++      }
++    }
++    if (!stripped) return;
++    next = reduced;
++  }
+ }
+ 
+ async function recordStep(
+diff --git a/tests/automation_condition_operators_correlation_observability.test.ts b/tests/automation_condition_operators_correlation_observability.test.ts
+index a05f37d..86fca86 100644
+--- a/tests/automation_condition_operators_correlation_observability.test.ts
++++ b/tests/automation_condition_operators_correlation_observability.test.ts
+@@ -11,7 +11,7 @@ import crypto from "node:crypto";
+ import fs from "node:fs";
+ import { evaluateCondition, validateConditionTree, CONDITION_OPERATORS } from "../server/workflow/conditionEngine.ts";
+ import { toWorkflowEventEnvelope, factsFromEnvelope } from "../server/workflow/eventEnvelope.ts";
+-import { processWorkflowEvent, retryWorkflowRun } from "../server/workflow/workflowEngine.ts";
++import { cancelWorkflowRun, processWorkflowEvent, retryWorkflowRun } from "../server/workflow/workflowEngine.ts";
+ import type { DomainEvent } from "../server/events/domainEvents.ts";
+ 
+ // --- Generic in-memory fake Supabase (same shape as workflow_engine_foundation.test.ts) ---
+@@ -85,6 +85,12 @@ function fakeSupabase(
+           return { data: wantSelectBack ? [{ ...record }] : [record], error: null };
+         }
+         if (mode === "update") {
++          const record = { ...(payload as Row) };
++          const blocked = missingColumns[table] || [];
++          const usedBlockedColumn = blocked.some((col) => col in record);
++          if (usedBlockedColumn) {
++            return { data: null, error: { code: "42703", message: `column ${table}.${blocked[0]} does not exist` } };
++          }
+           const matches = applyFilters(rows);
+           for (const row of matches) Object.assign(row, payload);
+           return { data: matches.map((r) => ({ ...r })), error: null };
+@@ -231,6 +237,51 @@ test("createRun degrades gracefully when workflow_runs.correlation_id/causation_
+   assert.equal(run.correlation_id, undefined, "no enrichment column written when the schema does not have it yet");
+ });
+ 
++test("createRun degrades gracefully when AG versioning columns are not applied yet", async () => {
++  const wf = workflowDefRow({ trigger_event_type: "employee.activated" });
++  const sb = seedEngineSupabase([wf], {
++    missingColumns: { workflow_runs: ["definition_version", "workflow_version_id", "state_transitions"] },
++  });
++  const event = makeEvent({ correlationId: "corr-ag", causationId: null });
++  const outcome = await processWorkflowEvent(sb, event);
++  assert.equal(outcome.runsStarted, 1, "runs must still start when 20260943000000 is not applied");
++  const run = (sb._tables.get("workflow_runs") || [])[0];
++  assert.equal(run.status, "completed");
++  assert.equal(run.correlation_id, "corr-ag");
++  assert.equal(run.definition_version, undefined);
++});
++
++test("createRun still starts when both AG versioning and correlation columns are missing", async () => {
++  const wf = workflowDefRow({ trigger_event_type: "employee.activated" });
++  const sb = seedEngineSupabase([wf], {
++    missingColumns: {
++      workflow_runs: ["definition_version", "workflow_version_id", "state_transitions", "correlation_id", "causation_id"],
++    },
++  });
++  const outcome = await processWorkflowEvent(sb, makeEvent());
++  assert.equal(outcome.runsStarted, 1);
++  const run = (sb._tables.get("workflow_runs") || [])[0];
++  assert.equal(run.status, "completed");
++  assert.equal(run.definition_version, undefined);
++  assert.equal(run.correlation_id, undefined);
++});
++
++test("cancelWorkflowRun still writes CANCELLED when state_transitions is not in the schema", async () => {
++  const wf = workflowDefRow({ trigger_event_type: "employee.activated" });
++  const sb = seedEngineSupabase([wf], {
++    missingColumns: { workflow_runs: ["definition_version", "workflow_version_id", "state_transitions"] },
++  });
++  const event = makeEvent();
++  await processWorkflowEvent(sb, event);
++  const run = (sb._tables.get("workflow_runs") || [])[0];
++  run.status = "running";
++  run.completed_at = null;
++  const cancelled = await cancelWorkflowRun(sb, run.id, "operator-1", "stop");
++  assert.equal(cancelled.status, "ok");
++  assert.equal(run.status, "CANCELLED");
++  assert.equal(run.state_transitions, undefined);
++});
++
+ // --- retryWorkflowRun event reconstruction ---
+ 
+ test("retryWorkflowRun reconstructs correlationId/causationId from the stored domain_events row, defaulting causationId to null", async () => {
+diff --git a/tests/schema_contracts.test.ts b/tests/schema_contracts.test.ts
+index 3c2faff..0b2b1c7 100644
+--- a/tests/schema_contracts.test.ts
++++ b/tests/schema_contracts.test.ts
+@@ -1,5 +1,6 @@
+ import assert from "node:assert/strict";
+ import test from "node:test";
++import fs from "node:fs";
+ import {
+   evaluateSchemaContracts,
+   probeTableColumns,
+@@ -127,6 +128,21 @@ test("billing schema missing is degraded, not blocked, and does not grant a read
+   assert.equal(report.overall, "degraded");
+   assert.deepEqual(sanitizeSchemaReadiness(report).affectedSubsystems, ["billing"]);
+ });
++
++test("missing workflow_runs version columns are degraded, not blocked", async () => {
++  const versioning = SCHEMA_CONTRACTS.find((c) => c.id === "workflow_runs_versioning");
++  const core = SCHEMA_CONTRACTS.find((c) => c.id === "workflow_runs_core");
++  assert.equal(versioning?.severity, "degraded");
++  assert.equal(core?.severity, "degraded");
++  const report = await evaluateSchemaContracts(
++    supabaseByTable({
++      workflow_runs: { code: "PGRST204", message: "Could not find the 'definition_version' column of 'workflow_runs' in the schema cache" },
++    }),
++    SCHEMA_CONTRACTS.filter((c) => c.id.startsWith("workflow_runs_")),
++  );
++  assert.equal(report.overall, "degraded");
++  assert.deepEqual(sanitizeSchemaReadiness(report).affectedSubsystems, ["workflow"]);
++});
+ test("PostgREST stale schema cache (PGRST204) is treated as missing schema", async () => {
+   const probe = await probeTableColumns(
+     supabaseWithResult({
+@@ -170,3 +186,14 @@ test("invitation insert still classifies 42703 and PGRST204 as SCHEMA_INCOMPLETE
+     (err: any) => err.code === "EMPLOYEE_INVITATION_SCHEMA_INCOMPLETE" && err.statusCode === 503,
+   );
+ });
++
++test("public /api/health is not stuck unknown: listen and first GET refresh schema contracts", () => {
++  const server = fs.readFileSync("server.ts", "utf8");
++  const listen = server.slice(server.indexOf("app.listen(PORT"));
++  assert.match(listen, /refreshSchemaReadiness/);
++  const publicHealth = server.slice(server.indexOf("// Public Minimal Safe Health Endpoint"), server.indexOf("// Public Safe Diagnostic Health Endpoint"));
++  assert.match(publicHealth, /getCachedSchemaReadiness\(\)/);
++  assert.match(publicHealth, /refreshSchemaReadiness/);
++  assert.match(publicHealth, /handlePublicHealth\(req, res\)/);
++  assert.equal((server.match(/app\.get\("\/api\/health"/g) || []).length, 1);
++});
