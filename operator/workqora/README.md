@@ -47,7 +47,7 @@ The full Workqora migration `supabase/migrations/20260943000000_workflow_run_lif
 
 BarberGo Actions: add secret `WORKQORA_GITHUB_TOKEN` (Contents + PRs write on Workqora), then **Actions → Ship Workqora createRun PR**.
 
-After Render, recert **worker-alone**: synthetic org, mutation off, `employee.activated` must create a `workflow_runs` row for that `event_id`, then delete the org.
+After columns exist or four-tier createRun is live, recert **worker-alone** with `python3 operator/workqora/recert-worker-alone.py` (loads Workqora `.env.local`). It waits for the Render dispatcher and **does not** call `claim_pending_domain_events`. Mutation off. Always deletes the synthetic org.
 
 ## After worker-alone runs exist (separate PRs)
 
