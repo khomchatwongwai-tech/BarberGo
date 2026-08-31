@@ -2,7 +2,7 @@
 
 Live `GET /api/health` and `origin/main` are **`ba654bf`** (Workqora `#305` DATA-15). That SHA does **not** include four-tier `createRun`. Production still uses the `#279` two-step insert (`baseRow` always includes `definition_version`). That column is missing, so the worker writes **zero** `workflow_runs`.
 
-Do **not** fold this into a DATA PR. Do **not** recert `ba654bf` (or earlier DATA SHAs) for worker-alone. Recert only when `/api/health` reports a SHA whose `createRun` has `tiers` / `coreRow`. Keep `WORKQORA_AUTONOMOUS_MUTATION` false.
+Do **not** fold this into a DATA PR. Do **not** recert `ba654bf` for worker-alone while `definition_version` is still missing. Recert `ba654bf` only after those columns exist, or recert a later SHA whose `createRun` has `tiers` / `coreRow`. Keep `WORKQORA_AUTONOMOUS_MUTATION` false.
 
 This kit is **not** a Workqora merge. `cursor[bot]` on BarberGo cannot push Workqora (403). Someone with Workqora write must open the createRun-only PR.
 
@@ -37,7 +37,11 @@ gh pr create --base main --title "fix(workflow): four-tier createRun when AG ver
 
 `01b-createrun-engine-only.patch` is the engine-only subset (same as replacing `workflowEngine.ts`).
 
-Equivalent schema path: apply `supabase/migrations/20260943000000_workflow_run_lifecycle_and_versioning.sql` on production Postgres (service role cannot DDL). That would also let current production two-step `createRun` insert.
+## Fastest schema path (Supabase SQL editor, no Render wait)
+
+Live two-step `createRun` would start inserting **on the current SHA** if these three columns exist. Open the Supabase SQL editor for the production project and run [`05-add-run-version-columns.sql`](./05-add-run-version-columns.sql). Do not run global claim RPCs. Then worker-alone can be recerted on `ba654bf` without a code deploy.
+
+The full Workqora migration `supabase/migrations/20260943000000_workflow_run_lifecycle_and_versioning.sql` is larger (versions table + RLS). The three-column file is enough for inserts.
 
 BarberGo Actions: add secret `WORKQORA_GITHUB_TOKEN` (Contents + PRs write on Workqora), then **Actions → Ship Workqora createRun PR**.
 
