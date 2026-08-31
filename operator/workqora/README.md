@@ -24,7 +24,7 @@ Equivalent: apply `supabase/migrations/20260943000000_workflow_run_lifecycle_and
 
 After Render has a SHA that includes createRun, recert **worker-alone**: synthetic org, mutation off, `employee.activated` must create a `workflow_runs` row for that `event_id`.
 
-Workqora issue: https://github.com/khomchatwongwai-tech/workqora/issues/299 (copy-paste). Also #296.
+Workqora issue: https://github.com/khomchatwongwai-tech/workqora/issues/302 (current SHA). Also #299 / #296.
 
 ## After worker-alone runs exist (do not mix into the first PR)
 
