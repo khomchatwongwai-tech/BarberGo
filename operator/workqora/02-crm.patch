@@ -1,4 +1,4 @@
-From ca9c26319138e6db7ac798b0938873966a1915ae Mon Sep 17 00:00:00 2001
+From 2f9c0ff91c643fee73eb8ba98e4a9acc460c6720 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Sun, 30 Aug 2026 22:28:55 +0000
 Subject: [PATCH] fix(automation): register CRM notify actions so follow-up

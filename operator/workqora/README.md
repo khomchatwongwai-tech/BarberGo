@@ -1,14 +1,14 @@
 # Workqora createRun operator kit
 
-Live `/api/health` and `origin/main` are both `ab8a7af` (`#301` DATA-13). That SHA does **not** include four-tier `createRun`. The worker processes `employee.activated` but creates **zero** `workflow_runs` because production `createRun` always inserts `definition_version` while that column is missing.
+`origin/main` is `8918b1d` (`#303` DATA-14). Live `/api/health` may lag on `ab8a7af` until Render. Neither SHA includes four-tier `createRun`. The worker processes `employee.activated` but creates **zero** `workflow_runs` because production `createRun` always inserts `definition_version` while that column is missing.
 
-`#301` is Command Center `attentionQueue` / `answerContract` only. Do **not** fold this kit into DATA PRs. Recert worker-alone only after `/api/health` reports a SHA that contains four-tier `createRun`. Do not recert `23cfa2d` or `ab8a7af` for the same hole.
+`#303` extends the existing data-quality engine only. Do **not** fold this kit into DATA PRs. Recert worker-alone only after `/api/health` reports a SHA that contains four-tier `createRun`. Do not recert `ab8a7af` or `8918b1d` for the same hole.
 
 This kit is **not** a Workqora merge. It is the apply path for someone with Workqora write (GitHub UI, `gh`, or a new Cloud Agent on that repo). Keep `WORKQORA_AUTONOMOUS_MUTATION` false. Do not call automation 100% GREEN.
 
 ## Ship first (required)
 
-From a clone of `khomchatwongwai-tech/workqora` at `origin/main` (`ab8a7af`; this patch still applies):
+From a clone of `khomchatwongwai-tech/workqora` at `origin/main` (`8918b1d`; this patch still applies):
 
 ```bash
 git checkout -b cursor/workflow-run-schema-fallback-bf1e
@@ -24,7 +24,7 @@ Equivalent: apply `supabase/migrations/20260943000000_workflow_run_lifecycle_and
 
 After Render has a SHA that includes createRun, recert **worker-alone**: synthetic org, mutation off, `employee.activated` must create a `workflow_runs` row for that `event_id`.
 
-Workqora issue: https://github.com/khomchatwongwai-tech/workqora/issues/302 (current SHA). Also #299 / #296.
+Workqora issue: https://github.com/khomchatwongwai-tech/workqora/issues/304 (current SHA). Also #302 / #299 / #296.
 
 ## After worker-alone runs exist (do not mix into the first PR)
 
