@@ -1,0 +1,231 @@
+From 93708caea1b1eb9a559db9ddd7f2a0ff221500c5 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sun, 30 Aug 2026 22:28:55 +0000
+Subject: [PATCH] fix(automation): register CRM notify actions so follow-up
+ events process
+
+#283 mapped crm.followup_due and crm.risk_detected onto typed actions that
+were not in the catalog, so the production worker failed the outbox with
+UNKNOWN_ACTION. Add notify-only definitions and handlers, fail-soft unknown
+mappings, and keep mutation off. No CRM table writes.
+---
+ .../handlers/verticalActionHandlers.ts        |  2 +
+ server/automation/typedActionRegistry.ts      |  2 +
+ server/automation/verticalEvents.ts           | 72 ++++++++++--------
+ tests/autonomous_operations_verticals.test.ts | 73 ++++++++++++++++++-
+ 4 files changed, 119 insertions(+), 30 deletions(-)
+
+diff --git a/server/automation/handlers/verticalActionHandlers.ts b/server/automation/handlers/verticalActionHandlers.ts
+index 10d9a2f..1b47998 100644
+--- a/server/automation/handlers/verticalActionHandlers.ts
++++ b/server/automation/handlers/verticalActionHandlers.ts
+@@ -59,6 +59,8 @@ export function registerVerticalActionHandlers(
+   registry.register(onboardingAssignHandler(ports));
+   registry.register(onboardingRemindHandler(ports));
+   registry.register(notifyManagerHandler(ports, 'onboarding.notify_manager', 'Onboarding notice'));
++  registry.register(notifyManagerHandler(ports, 'crm.follow_up', 'CRM follow-up due'));
++  registry.register(notifyManagerHandler(ports, 'crm.escalate_risk', 'CRM account at risk'));
+   registry.register(managerSummaryHandler(ports));
+   registry.register(periodReportHandler(ports, 'reports.generate_weekly', 'weekly'));
+   registry.register(periodReportHandler(ports, 'reports.generate_monthly', 'monthly'));
+diff --git a/server/automation/typedActionRegistry.ts b/server/automation/typedActionRegistry.ts
+index 1b87f00..bd624b8 100644
+--- a/server/automation/typedActionRegistry.ts
++++ b/server/automation/typedActionRegistry.ts
+@@ -103,6 +103,8 @@ export const TYPED_ACTION_DEFINITIONS: readonly TypedActionDefinition[] = [
+   def('checklist.remind', 'checklist', 'checklist.view', 'low', { inputKeys: ['checklistId'] }),
+   def('checklist.escalate', 'checklist', 'checklist.manage', 'low', { inputKeys: ['checklistId'] }),
+   def('hiring.follow_up', 'hiring', 'hiring.view', 'low', { inputKeys: ['applicationId'] }),
++  def('crm.follow_up', 'communication', 'communication.send', 'low', { inputKeys: ['accountId'] }),
++  def('crm.escalate_risk', 'communication', 'communication.send', 'low', { inputKeys: ['accountId'] }),
+   def('hiring.offer', 'hiring', 'hiring.manage', 'high', { sensitive: true, inputKeys: ['applicationId'] }),
+   def('onboarding.assign_step', 'onboarding', 'hiring.manage', 'low', { idempotencyBehavior: 'unique_target', inputKeys: ['employeeId', 'stepId'] }),
+   def('onboarding.remind', 'onboarding', 'hiring.view', 'low', { inputKeys: ['employeeId', 'stepId'] }),
+diff --git a/server/automation/verticalEvents.ts b/server/automation/verticalEvents.ts
+index e7d79cd..06d276d 100644
+--- a/server/automation/verticalEvents.ts
++++ b/server/automation/verticalEvents.ts
+@@ -1,8 +1,9 @@
+ import { mayEnqueueFromDomainEvent } from './automationEvents.ts';
+-import { processAutonomousProposal, type AutonomousActor } from './automationExecutionEngine.ts';
++import { AutomationAuthorizationError, processAutonomousProposal, type AutonomousActor } from './automationExecutionEngine.ts';
+ import type { AutomationPersistence } from './automationExecutionStore.ts';
+ import type { TypedActionRegistry } from './typedActionRegistry.ts';
+ import type { DomainEvent } from '../events/domainEvents.ts';
++import { logWarn } from '../ops/logger.ts';
+ 
+ export const VERTICAL_EVENT_ACTIONS: Record<string, { actionType: string; targetFrom: 'entityId' | 'shiftId' | 'employeeId' }> = {
+   'punch.created': { actionType: 'attendance.flag_anomaly', targetFrom: 'entityId' },
+@@ -51,33 +52,46 @@ export async function enqueueVerticalAutomation(input: {
+   const targetId = mapped.targetFrom === 'employeeId'
+     ? String(input.event.payload.employeeId || input.event.entityId)
+     : input.event.entityId;
+-  const execution = await processAutonomousProposal({
+-    store: input.store,
+-    registry: input.registry,
+-    actor: input.actor,
+-    proposal: {
+-      organizationId: input.actor.organizationId,
+-      locationId: input.event.locationId,
+-      actionType: mapped.actionType,
+-      triggerEventId: input.event.id,
+-      correlationId: input.event.idempotencyKey,
+-      targetId,
+-      payload: {
+-        ...input.event.payload,
+-        itemId: input.event.payload.itemId || input.event.entityId,
+-        equipmentId: input.event.payload.equipmentId || input.event.entityId,
+-        ticketId: input.event.payload.ticketId || input.event.entityId,
+-        assignmentId: input.event.payload.assignmentId || input.event.entityId,
+-        applicationId: input.event.payload.applicationId || input.event.entityId,
+-        employeeId: input.event.payload.employeeId || input.event.entityId,
+-        countId: input.event.payload.countId || input.event.entityId,
+-        recordId: input.event.payload.recordId || input.event.entityId,
+-        stepId: input.event.payload.stepId || input.event.entityId,
+-        body: typeof input.event.payload.body === 'string' ? input.event.payload.body : 'Automation notice',
++  try {
++    const execution = await processAutonomousProposal({
++      store: input.store,
++      registry: input.registry,
++      actor: input.actor,
++      proposal: {
++        organizationId: input.actor.organizationId,
++        locationId: input.event.locationId,
++        actionType: mapped.actionType,
++        triggerEventId: input.event.id,
++        correlationId: input.event.idempotencyKey,
++        targetId,
++        payload: {
++          ...input.event.payload,
++          itemId: input.event.payload.itemId || input.event.entityId,
++          equipmentId: input.event.payload.equipmentId || input.event.entityId,
++          ticketId: input.event.payload.ticketId || input.event.entityId,
++          assignmentId: input.event.payload.assignmentId || input.event.entityId,
++          applicationId: input.event.payload.applicationId || input.event.entityId,
++          employeeId: input.event.payload.employeeId || input.event.entityId,
++          accountId: input.event.payload.accountId || input.event.entityId,
++          countId: input.event.payload.countId || input.event.entityId,
++          recordId: input.event.payload.recordId || input.event.entityId,
++          stepId: input.event.payload.stepId || input.event.entityId,
++          body: typeof input.event.payload.body === 'string' ? input.event.payload.body : 'Automation notice',
++        },
+       },
+-    },
+-    mutationFlagEnabled: input.mutationFlagEnabled,
+-    platformPaused: input.platformPaused,
+-  });
+-  return { enqueued: execution.status === 'pending', reason: execution.status, execution };
++      mutationFlagEnabled: input.mutationFlagEnabled,
++      platformPaused: input.platformPaused,
++    });
++    return { enqueued: execution.status === 'pending', reason: execution.status, execution };
++  } catch (error) {
++    if (error instanceof AutomationAuthorizationError && error.code === 'UNKNOWN_ACTION') {
++      logWarn('automation.vertical_unknown_action', {
++        organizationId: input.event.organizationId,
++        errorCategory: 'UNKNOWN_ACTION',
++        metadata: { eventId: input.event.id, eventType: input.event.eventType, actionType: mapped.actionType },
++      });
++      return { enqueued: false, reason: 'unknown_typed_action' };
++    }
++    throw error;
++  }
+ }
+diff --git a/tests/autonomous_operations_verticals.test.ts b/tests/autonomous_operations_verticals.test.ts
+index 79d58d3..ae57bff 100644
+--- a/tests/autonomous_operations_verticals.test.ts
++++ b/tests/autonomous_operations_verticals.test.ts
+@@ -6,7 +6,7 @@ import { createMemoryAutomationHandlerPorts } from '../server/automation/handler
+ import { createProductionTypedActionRegistry, getTypedActionDefinition } from '../server/automation/typedActionRegistry.ts';
+ import { runAutomationWorker } from '../server/automation/automationWorker.ts';
+ import { createMemoryMembershipResolver, resolveFreshAutomationActor } from '../server/automation/freshAuthorization.ts';
+-import { enqueueVerticalAutomation } from '../server/automation/verticalEvents.ts';
++import { enqueueVerticalAutomation, VERTICAL_EVENT_ACTIONS } from '../server/automation/verticalEvents.ts';
+ import { detectAttendanceAnomalies } from '../server/operations/attendanceAnomalies.ts';
+ import { certificationAffectsSchedule } from '../server/automation/handlers/verticalPorts.ts';
+ import { mayEnqueueFromDomainEvent } from '../server/automation/automationEvents.ts';
+@@ -56,6 +56,8 @@ test('PR D registers vertical handlers and keeps hiring.offer unexecuted', () =>
+   assert.equal(registry.hasExecutor('training.assign'), true);
+   assert.equal(registry.hasExecutor('certification.remind'), true);
+   assert.equal(registry.hasExecutor('hiring.follow_up'), true);
++  assert.equal(registry.hasExecutor('crm.follow_up'), true);
++  assert.equal(registry.hasExecutor('crm.escalate_risk'), true);
+   assert.equal(registry.hasExecutor('onboarding.assign_step'), true);
+   assert.equal(registry.hasExecutor('reports.generate_weekly'), true);
+   assert.equal(registry.hasExecutor('hiring.offer'), false);
+@@ -455,3 +457,72 @@ test('correction request does not approve payroll hours', async () => {
+   assert.equal(result.approvedHoursMutated, false);
+   assert.equal(ports.vertical.approvedHours[0].approvedHours, 8);
+ });
++
++test('CRM follow-up and risk verticals enqueue notify-only handlers without CRM table writes', async () => {
++  const store = createMemoryAutomationPersistence();
++  await seedPolicy(store);
++  const registry = createProductionTypedActionRegistry();
++  const follow = await enqueueVerticalAutomation({
++    event: createDomainEvent({
++      eventType: 'crm.followup_due',
++      organizationId: orgA,
++      locationId: locA,
++      entityId: 'crm_tsk_1',
++      idempotencyKey: 'crm.followup_due:crm_tsk_1',
++      payload: { accountId: 'crm_acc_1', title: 'Quarterly Review', body: 'Follow up is due' },
++    }),
++    store,
++    registry,
++    actor: admin,
++    mutationFlagEnabled: false,
++    platformPaused: false,
++  });
++  assert.equal(follow.execution?.actionType, 'crm.follow_up');
++  assert.notEqual(follow.execution?.status, 'failed');
++
++  const risk = await enqueueVerticalAutomation({
++    event: createDomainEvent({
++      eventType: 'crm.risk_detected',
++      organizationId: orgA,
++      locationId: locA,
++      entityId: 'crm_acc_1',
++      idempotencyKey: 'crm.risk_detected:crm_acc_1',
++      payload: { healthScore: 30, body: 'Account is at risk' },
++    }),
++    store,
++    registry,
++    actor: admin,
++    mutationFlagEnabled: false,
++    platformPaused: false,
++  });
++  assert.equal(risk.execution?.actionType, 'crm.escalate_risk');
++  assert.notEqual(risk.execution?.status, 'failed');
++});
++
++test('unknown typed vertical mapping fail-softs so the domain-event outbox can still process', async () => {
++  const store = createMemoryAutomationPersistence();
++  await seedPolicy(store);
++  const registry = createProductionTypedActionRegistry();
++  VERTICAL_EVENT_ACTIONS['crm.task_completed'] = { actionType: 'crm.does_not_exist', targetFrom: 'entityId' };
++  try {
++    const result = await enqueueVerticalAutomation({
++      event: createDomainEvent({
++        eventType: 'crm.task_completed',
++        organizationId: orgA,
++        locationId: locA,
++        entityId: 'crm_tsk_done',
++        idempotencyKey: 'crm.task_completed:crm_tsk_done',
++        payload: {},
++      }),
++      store,
++      registry,
++      actor: admin,
++      mutationFlagEnabled: false,
++      platformPaused: false,
++    });
++    assert.equal(result.enqueued, false);
++    assert.equal(result.reason, 'unknown_typed_action');
++  } finally {
++    delete VERTICAL_EVENT_ACTIONS['crm.task_completed'];
++  }
++});
+-- 
+2.43.0
+

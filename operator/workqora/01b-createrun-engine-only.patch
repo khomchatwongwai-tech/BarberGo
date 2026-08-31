@@ -1,0 +1,113 @@
+diff --git a/server/workflow/workflowEngine.ts b/server/workflow/workflowEngine.ts
+index 173de28..401a105 100644
+--- a/server/workflow/workflowEngine.ts
++++ b/server/workflow/workflowEngine.ts
+@@ -129,7 +129,7 @@ async function createRun(sb: SupabaseClient, workflow: WorkflowDefinitionRow, ev
+     actorId: event.actor?.userId || null,
+   };
+ 
+-  const baseRow = {
++  const coreRow = {
+     id,
+     workflow_id: workflow.id,
+     organization_id: workflow.organization_id,
+@@ -138,44 +138,69 @@ async function createRun(sb: SupabaseClient, workflow: WorkflowDefinitionRow, ev
+     event_type: event.eventType,
+     status: "pending",
+     attempt_count: 0,
++    started_at: now,
++    updated_at: now,
++  };
++  const versionFields = {
+     definition_version: defVersion,
+     workflow_version_id: versionId,
+     state_transitions: [initialTransition],
+-    started_at: now,
+-    updated_at: now,
+   };
+-
+-  const attempt = await sb
+-    .from("workflow_runs")
+-    .insert({
+-      ...baseRow,
+-      correlation_id: event.correlationId || event.id,
+-      causation_id: event.causationId ?? null,
+-    })
+-    .select()
+-    .maybeSingle();
+-
+-  let data = attempt.data;
+-  let error = attempt.error;
+-  if (error && isMissingSchemaError(error)) {
+-    const fallback = await sb.from("workflow_runs").insert(baseRow).select().maybeSingle();
+-    data = fallback.data;
+-    error = fallback.error;
+-  }
+-  if (error) {
+-    if (error.code === "23505") return null;
+-    logWarn("workflow.run_creation_failed", {
+-      organizationId: workflow.organization_id,
+-      errorCategory: error.code || "unknown",
+-      metadata: { workflowId: workflow.id, eventId: event.id, eventType: event.eventType, message: error.message },
+-    });
+-    return null;
++  const correlationFields = {
++    correlation_id: event.correlationId || event.id,
++    causation_id: event.causationId ?? null,
++  };
++  // Production may lack AG version columns, correlation columns, or both.
++  // #279 only retried without correlation columns, so missing definition_version
++  // still created zero runs. Keep trying until a schema-compatible insert succeeds.
++  const tiers = [
++    { ...coreRow, ...versionFields, ...correlationFields },
++    { ...coreRow, ...versionFields },
++    { ...coreRow, ...correlationFields },
++    coreRow,
++  ];
++
++  let lastError: { code?: string; message?: string } | null = null;
++  for (const row of tiers) {
++    const attempt = await sb.from("workflow_runs").insert(row).select().maybeSingle();
++    if (!attempt.error) return attempt.data as WorkflowRunRow;
++    lastError = attempt.error;
++    if (attempt.error.code === "23505") return null;
++    if (!isMissingSchemaError(attempt.error)) break;
+   }
+-  return data as WorkflowRunRow;
++  logWarn("workflow.run_creation_failed", {
++    organizationId: workflow.organization_id,
++    errorCategory: lastError?.code || "unknown",
++    metadata: { workflowId: workflow.id, eventId: event.id, eventType: event.eventType, message: lastError?.message },
++  });
++  return null;
+ }
+ 
++const OPTIONAL_RUN_SCHEMA_KEYS = [
++  "definition_version",
++  "workflow_version_id",
++  "state_transitions",
++  "correlation_id",
++  "causation_id",
++] as const;
++
+ async function updateRun(sb: SupabaseClient, runId: string, patch: Record<string, unknown>): Promise<void> {
+-  await sb.from("workflow_runs").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", runId);
++  let next: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() };
++  for (;;) {
++    const attempt = await sb.from("workflow_runs").update(next).eq("id", runId);
++    if (!attempt.error) return;
++    if (!isMissingSchemaError(attempt.error)) return;
++    let stripped = false;
++    const reduced: Record<string, unknown> = { ...next };
++    for (const key of OPTIONAL_RUN_SCHEMA_KEYS) {
++      if (key in reduced) {
++        delete reduced[key];
++        stripped = true;
++      }
++    }
++    if (!stripped) return;
++    next = reduced;
++  }
+ }
+ 
+ async function recordStep(

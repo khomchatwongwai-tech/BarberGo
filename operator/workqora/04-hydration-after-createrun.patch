@@ -1,0 +1,560 @@
+From 97a9eeecdfda8a4d2e108c9e0cd53016deaa2012 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sun, 30 Aug 2026 22:34:53 +0000
+Subject: [PATCH] fix(workflow): hydrate source-row facts before matching and
+ running workflows
+
+Live enqueue still stores {op, table} for several triggers. Copy location and
+condition facts from the tenant source row so location-scoped definitions and
+coverage/inventory/waste/repair conditions can evaluate without waiting on
+schema migrations. Tenant-scoped; does not invent swapRole or conflictCount.
+---
+ server/events/workflowEventFacts.ts           | 193 +++++++++++++++
+ server/workflow/eventEnvelope.ts              |  10 +-
+ server/workflow/workflowEngine.ts             |  13 +-
+ .../workflow_event_payload_enrichment.test.ts | 232 +++++++++++++++++-
+ 4 files changed, 441 insertions(+), 7 deletions(-)
+
+diff --git a/server/events/workflowEventFacts.ts b/server/events/workflowEventFacts.ts
+index cc0dc3f..5355847 100644
+--- a/server/events/workflowEventFacts.ts
++++ b/server/events/workflowEventFacts.ts
+@@ -1,3 +1,6 @@
++import type { SupabaseClient } from "@supabase/supabase-js";
++import type { DomainEvent } from "./domainEvents.ts";
++
+ /** Facts copied onto domain-event payloads so workflow conditions can evaluate. */
+ 
+ const WORKFLOW_FACT_KEYS = [
+@@ -38,6 +41,8 @@ const WORKFLOW_FACT_KEYS = [
+   "equipmentId",
+   "daysOverdue",
+   "scheduledMaintenanceDate",
++  "applicationId",
++  "stepId",
+ ] as const;
+ 
+ export function minutesLateFromTimes(
+@@ -93,3 +98,191 @@ export function pickWorkflowEventPayload(
+   }
+   return payload;
+ }
++
++function stringFact(value: unknown): string | null {
++  if (typeof value !== "string") return null;
++  const trimmed = value.trim();
++  return trimmed ? trimmed : null;
++}
++
++function missingFact(value: unknown): boolean {
++  return value === undefined || value === null || value === "";
++}
++
++function isTimeOffEvent(eventType: string): boolean {
++  return eventType.startsWith("timeoff.") || eventType.startsWith("time_off.");
++}
++
++function isShiftSwapEvent(eventType: string): boolean {
++  return eventType === "shift.swap_requested"
++    || eventType === "shift.swap_approved"
++    || eventType === "shift.swap_rejected";
++}
++
++function isCertificateEvent(eventType: string): boolean {
++  return eventType === "certificate.expiring" || eventType === "certificate.expired";
++}
++
++function isInventoryEvent(eventType: string): boolean {
++  return eventType === "inventory.updated" || eventType === "inventory.low";
++}
++
++function isRepairTicketEvent(eventType: string): boolean {
++  return eventType === "maintenance.created" || eventType === "equipment.issue_reported";
++}
++
++function isWasteEvent(eventType: string): boolean {
++  return eventType === "waste.recorded" || eventType === "waste.threshold_exceeded";
++}
++
++/** Fill location / coverage / swap facts from the source request row when the
++ * live enqueue trigger has not yet been replaced by 20260944000000.
++ * Tenant-scoped. Does not invent swapRole or conflictCount. */
++export async function hydrateWorkflowDomainEvent(
++  sb: Pick<SupabaseClient, "from">,
++  event: DomainEvent,
++): Promise<DomainEvent> {
++  const payload: Record<string, unknown> = { ...(event.payload || {}) };
++  let locationId = stringFact(event.locationId) || stringFact(payload.locationId) || stringFact(payload.location_id);
++  const timeOff = isTimeOffEvent(event.eventType);
++  const swap = isShiftSwapEvent(event.eventType);
++  const certificate = isCertificateEvent(event.eventType);
++  const needsSourceRow = Boolean(
++    event.entityId
++    && event.organizationId
++    && (timeOff || swap)
++    && (!locationId || (timeOff && missingFact(payload.conflictCount)) || (swap && missingFact(payload.swapRole))),
++  );
++
++  if (needsSourceRow) {
++    const table = timeOff ? "time_off_requests" : "shift_swap_requests";
++    const { data } = await sb
++      .from(table)
++      .select("payload")
++      .eq("id", event.entityId)
++      .eq("organization_id", event.organizationId)
++      .maybeSingle();
++    const source = data?.payload && typeof data.payload === "object" && !Array.isArray(data.payload)
++      ? data.payload as Record<string, unknown>
++      : {};
++    const facts = pickWorkflowEventPayload(table, source);
++    for (const [key, value] of Object.entries(facts)) {
++      if (key === "resource") continue;
++      if (missingFact(payload[key])) payload[key] = value;
++    }
++    locationId = locationId || stringFact(source.locationId) || stringFact(source.location_id);
++  }
++
++  if (
++    certificate
++    && event.entityId
++    && event.organizationId
++    && (missingFact(payload.daysUntilExpiration) || missingFact(payload.employeeId))
++  ) {
++    const { data } = await sb
++      .from("employee_certifications")
++      .select("employee_id, expiration_date, certification_type")
++      .eq("id", event.entityId)
++      .eq("organization_id", event.organizationId)
++      .maybeSingle();
++    if (data) {
++      const facts = pickWorkflowEventPayload("employee_certifications", {
++        employeeId: data.employee_id,
++        expirationDate: data.expiration_date,
++        certificationType: data.certification_type,
++        daysUntilExpiration: daysUntilDate(typeof data.expiration_date === "string" ? data.expiration_date : null),
++      });
++      for (const [key, value] of Object.entries(facts)) {
++        if (key === "resource") continue;
++        if (missingFact(payload[key])) payload[key] = value;
++      }
++    }
++  }
++
++  if (
++    isInventoryEvent(event.eventType)
++    && event.entityId
++    && event.organizationId
++    && (missingFact(payload.quantity) || missingFact(payload.reorderPoint))
++  ) {
++    const { data } = await sb
++      .from("inventory_items")
++      .select("quantity_on_hand, reorder_point, par_level, location_id, name")
++      .eq("id", event.entityId)
++      .eq("organization_id", event.organizationId)
++      .maybeSingle();
++    if (data) {
++      const reorder = data.reorder_point ?? data.par_level;
++      const facts = pickWorkflowEventPayload("inventory_items", {
++        quantity: data.quantity_on_hand,
++        reorderPoint: reorder,
++        itemName: data.name,
++        itemId: event.entityId,
++        locationId: data.location_id,
++      });
++      for (const [key, value] of Object.entries(facts)) {
++        if (key === "resource") continue;
++        if (missingFact(payload[key])) payload[key] = value;
++      }
++      locationId = locationId || stringFact(data.location_id);
++    }
++  }
++
++  if (
++    isRepairTicketEvent(event.eventType)
++    && event.entityId
++    && event.organizationId
++    && (missingFact(payload.priority) || missingFact(payload.ticketId) || missingFact(payload.equipmentId))
++  ) {
++    const { data } = await sb
++      .from("equipment_repair_tickets")
++      .select("id, equipment_id, location_id, priority, equipment_name")
++      .eq("id", event.entityId)
++      .eq("organization_id", event.organizationId)
++      .maybeSingle();
++    if (data) {
++      const facts = pickWorkflowEventPayload("equipment_repair_tickets", {
++        ticketId: data.id,
++        equipmentId: data.equipment_id,
++        itemId: data.equipment_id,
++        itemName: data.equipment_name,
++        priority: data.priority,
++        locationId: data.location_id,
++      });
++      for (const [key, value] of Object.entries(facts)) {
++        if (key === "resource") continue;
++        if (missingFact(payload[key])) payload[key] = value;
++      }
++      locationId = locationId || stringFact(data.location_id);
++    }
++  }
++
++  if (
++    isWasteEvent(event.eventType)
++    && event.entityId
++    && event.organizationId
++    && (missingFact(payload.quantity) || missingFact(payload.itemId))
++  ) {
++    const { data } = await sb
++      .from("waste_records")
++      .select("quantity_wasted, item_id, item_name, location_id")
++      .eq("id", event.entityId)
++      .eq("organization_id", event.organizationId)
++      .maybeSingle();
++    if (data) {
++      const facts = pickWorkflowEventPayload("waste_records", {
++        quantity: data.quantity_wasted,
++        itemId: data.item_id,
++        itemName: data.item_name,
++        locationId: data.location_id,
++      });
++      for (const [key, value] of Object.entries(facts)) {
++        if (key === "resource") continue;
++        if (missingFact(payload[key])) payload[key] = value;
++      }
++      locationId = locationId || stringFact(data.location_id);
++    }
++  }
++
++  return { ...event, locationId, payload };
++}
+diff --git a/server/workflow/eventEnvelope.ts b/server/workflow/eventEnvelope.ts
+index bc65d86..1a38bed 100644
+--- a/server/workflow/eventEnvelope.ts
++++ b/server/workflow/eventEnvelope.ts
+@@ -17,12 +17,20 @@ function subjectTypeFor(eventType: string): string {
+  * contract. Additive adapter, not a second event table - see the research
+  * notes in the PR description for why domain_events (with its outbox,
+  * idempotency, and retry already production-tested) is reused as-is. */
++function locationIdFromEvent(event: DomainEvent): string | null {
++  const fromEvent = typeof event.locationId === "string" && event.locationId.trim() ? event.locationId.trim() : null;
++  if (fromEvent) return fromEvent;
++  const payload = event.payload || {};
++  const fromPayload = payload.locationId ?? payload.location_id;
++  return typeof fromPayload === "string" && fromPayload.trim() ? fromPayload.trim() : null;
++}
++
+ export function toWorkflowEventEnvelope(event: DomainEvent): WorkflowEventEnvelope {
+   return {
+     eventId: event.id,
+     eventType: event.eventType,
+     organizationId: event.organizationId,
+-    locationId: event.locationId ?? null,
++    locationId: locationIdFromEvent(event),
+     actorId: event.actorId ?? event.actor?.userId ?? null,
+     subjectType: subjectTypeFor(event.eventType),
+     subjectId: event.entityId,
+diff --git a/server/workflow/workflowEngine.ts b/server/workflow/workflowEngine.ts
+index 401a105..ba20eb3 100644
+--- a/server/workflow/workflowEngine.ts
++++ b/server/workflow/workflowEngine.ts
+@@ -23,6 +23,7 @@ import {
+   isTerminalWorkflowRunStatus,
+ } from "./workflowRunStateMachine.ts";
+ import { formatWorkflowVersionId, getWorkflowDefinitionVersion } from "./workflowVersioning.ts";
++import { hydrateWorkflowDomainEvent } from "../events/workflowEventFacts.ts";
+ 
+ export const MAX_WORKFLOW_RUN_ATTEMPTS = 5;
+ 
+@@ -94,7 +95,8 @@ async function findExistingRun(sb: MinimalSupabase, workflowId: string, eventId:
+  * dispatcher's per-event consumer loop - see domainEventDispatcher.ts's
+  * DOMAIN_EVENT_CONSUMERS.workflowEngine wiring. */
+ export async function processWorkflowEvent(sb: SupabaseClient, event: DomainEvent): Promise<{ runsStarted: number; runsSkipped: number }> {
+-  const workflows = await findMatchingWorkflows(sb, event);
++  const hydrated = await hydrateWorkflowDomainEvent(sb, event);
++  const workflows = await findMatchingWorkflows(sb, hydrated);
+   let runsStarted = 0;
+   let runsSkipped = 0;
+   for (const workflow of workflows) {
+@@ -103,14 +105,14 @@ export async function processWorkflowEvent(sb: SupabaseClient, event: DomainEven
+       runsSkipped++;
+       const norm = normalizeWorkflowRunStatus(existing.status);
+       if (norm === "QUEUED" || norm === "FAILED") {
+-        await runWorkflow(sb, workflow, existing, event);
++        await runWorkflow(sb, workflow, existing, hydrated);
+       }
+       continue;
+     }
+-    const run = await createRun(sb, workflow, event);
++    const run = await createRun(sb, workflow, hydrated);
+     if (!run) continue;
+     runsStarted++;
+-    await runWorkflow(sb, workflow, run, event);
++    await runWorkflow(sb, workflow, run, hydrated);
+   }
+   return { runsStarted, runsSkipped };
+ }
+@@ -561,6 +563,7 @@ export async function retryWorkflowRun(sb: SupabaseClient, runId: string): Promi
+     actor: eventRow.actor, idempotencyKey: eventRow.idempotency_key, payload: eventRow.payload || {},
+     correlationId: eventRow.correlation_id || eventRow.id, causationId: eventRow.causation_id ?? null,
+   };
+-  await runWorkflow(sb, workflow as WorkflowDefinitionRow, run as WorkflowRunRow, event);
++  const hydrated = await hydrateWorkflowDomainEvent(sb, event);
++  await runWorkflow(sb, workflow as WorkflowDefinitionRow, run as WorkflowRunRow, hydrated);
+   return { status: "ok" };
+ }
+diff --git a/tests/workflow_event_payload_enrichment.test.ts b/tests/workflow_event_payload_enrichment.test.ts
+index 63b3e48..d9e316f 100644
+--- a/tests/workflow_event_payload_enrichment.test.ts
++++ b/tests/workflow_event_payload_enrichment.test.ts
+@@ -1,10 +1,11 @@
+ import assert from "node:assert/strict";
+ import fs from "node:fs";
+ import test from "node:test";
+-import { daysUntilDate, minutesLateFromTimes, pickWorkflowEventPayload } from "../server/events/workflowEventFacts.ts";
++import { daysUntilDate, hydrateWorkflowDomainEvent, minutesLateFromTimes, pickWorkflowEventPayload } from "../server/events/workflowEventFacts.ts";
+ import { afterPunchCreated } from "../server/workforce/attendanceService.ts";
+ import { approveInventoryCount, listExpiringCertifications } from "../server/operations/opsModulesService.ts";
+ import { evaluateCondition } from "../server/workflow/conditionEngine.ts";
++import { toWorkflowEventEnvelope } from "../server/workflow/eventEnvelope.ts";
+ import { processWorkflowEvent } from "../server/workflow/workflowEngine.ts";
+ import { WORKFLOW_TEMPLATES } from "../server/workflow/workflowTemplates.ts";
+ import { emitLifecycleEvent } from "../server/workforce/lifecycleEvents.ts";
+@@ -329,6 +330,235 @@ test("pickWorkflowEventPayload never copies arbitrary metadata keys", () => {
+   assert.equal("token" in payload, false);
+ });
+ 
++test("hydrateWorkflowDomainEvent copies location and conflictCount from the tenant request row", async () => {
++  const sb = fakeSupabase({
++    time_off_requests: [{
++      id: "pto-1",
++      organization_id: "org-a",
++      payload: { locationId: "loc-a", conflictCount: 2, password: "nope" },
++    }],
++    time_off_requests_other: [],
++  });
++  const hydrated = await hydrateWorkflowDomainEvent(sb, {
++    id: "evt-to",
++    eventType: "timeoff.approved",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "pto-1",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "timeoff.approved:pto-1",
++    payload: { table: "time_off_requests", op: "UPDATE", employeeId: "emp-a" },
++  });
++  assert.equal(hydrated.locationId, "loc-a");
++  assert.equal(hydrated.payload.conflictCount, 2);
++  assert.equal(hydrated.payload.employeeId, "emp-a");
++  assert.equal("password" in hydrated.payload, false);
++});
++
++test("hydrateWorkflowDomainEvent does not read another organization's swap request", async () => {
++  const sb = fakeSupabase({
++    shift_swap_requests: [{
++      id: "swap-1",
++      organization_id: "org-b",
++      payload: { locationId: "loc-b", swapRole: "requester" },
++    }],
++  });
++  const hydrated = await hydrateWorkflowDomainEvent(sb, {
++    id: "evt-swap",
++    eventType: "shift.swap_approved",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "swap-1",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "shift.swap_approved:swap-1",
++    payload: { table: "shift_swap_requests", op: "UPDATE" },
++  });
++  assert.equal(hydrated.locationId, null);
++  assert.equal(hydrated.payload.swapRole, undefined);
++});
++
++test("hydrateWorkflowDomainEvent copies certificate daysUntilExpiration from the tenant cert row", async () => {
++  const sb = fakeSupabase({
++    employee_certifications: [{
++      id: "cert-1",
++      organization_id: "org-a",
++      employee_id: "emp-a",
++      expiration_date: "2026-09-06",
++      certification_type: "servsafe_food_handler",
++    }],
++  });
++  const hydrated = await hydrateWorkflowDomainEvent(sb, {
++    id: "evt-cert",
++    eventType: "certificate.expiring",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "cert-1",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "certificate.expiring:cert-1",
++    payload: { table: "employee_certifications", op: "INSERT" },
++  });
++  assert.equal(hydrated.payload.employeeId, "emp-a");
++  assert.equal(hydrated.payload.expirationDate, "2026-09-06");
++  assert.equal(typeof hydrated.payload.daysUntilExpiration, "number");
++  assert.ok((hydrated.payload.daysUntilExpiration as number) < 31);
++});
++
++test("hydrateWorkflowDomainEvent copies inventory quantity and reorderPoint from the item row", async () => {
++  const sb = fakeSupabase({
++    inventory_items: [{
++      id: "item-1",
++      organization_id: "org-a",
++      location_id: "loc-a",
++      name: "Fries",
++      quantity_on_hand: 2,
++      reorder_point: 8,
++    }],
++  });
++  const hydrated = await hydrateWorkflowDomainEvent(sb, {
++    id: "evt-inv",
++    eventType: "inventory.updated",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "item-1",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "inventory.updated:item-1",
++    payload: { table: "inventory_items", op: "INSERT" },
++  });
++  assert.equal(hydrated.locationId, "loc-a");
++  assert.equal(hydrated.payload.quantity, 2);
++  assert.equal(hydrated.payload.reorderPoint, 8);
++  assert.equal(hydrated.payload.itemName, "Fries");
++});
++
++test("hydrateWorkflowDomainEvent copies waste quantity from the tenant waste row", async () => {
++  const sb = fakeSupabase({
++    waste_records: [{
++      id: "waste-1",
++      organization_id: "org-a",
++      item_id: "item-1",
++      item_name: "Fries",
++      location_id: "loc-a",
++      quantity_wasted: 4,
++    }],
++  });
++  const hydrated = await hydrateWorkflowDomainEvent(sb, {
++    id: "evt-waste",
++    eventType: "waste.recorded",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "waste-1",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "waste.recorded:waste-1",
++    payload: { table: "waste_records", op: "INSERT" },
++  });
++  assert.equal(hydrated.locationId, "loc-a");
++  assert.equal(hydrated.payload.quantity, 4);
++  assert.equal(hydrated.payload.itemId, "item-1");
++});
++
++test("hydrateWorkflowDomainEvent copies repair-ticket priority from the tenant ticket row", async () => {
++  const sb = fakeSupabase({
++    equipment_repair_tickets: [{
++      id: "repair-1",
++      organization_id: "org-a",
++      equipment_id: "eq-1",
++      location_id: "loc-a",
++      priority: "urgent_emergency",
++      equipment_name: "Walk-in freezer",
++    }],
++  });
++  const hydrated = await hydrateWorkflowDomainEvent(sb, {
++    id: "evt-maint",
++    eventType: "maintenance.created",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "repair-1",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "maintenance.created:repair-1",
++    payload: { table: "equipment_repair_tickets", op: "INSERT" },
++  });
++  assert.equal(hydrated.locationId, "loc-a");
++  assert.equal(hydrated.payload.priority, "urgent_emergency");
++  assert.equal(hydrated.payload.ticketId, "repair-1");
++  assert.equal(hydrated.payload.equipmentId, "eq-1");
++});
++
++test("time-off coverage workflow meets conditions after source-row hydration", async () => {
++  const wf = {
++    id: "wf-coverage",
++    organization_id: "org-a",
++    location_id: null,
++    name: "Coverage",
++    description: null,
++    enabled: true,
++    trigger_event_type: "timeoff.approved",
++    conditions: { all: [{ field: "payload.conflictCount", operator: "greater_than", value: 0 }] },
++    actions: [{ action: "write_audit_event", params: { action: "timeoff.approved_coverage_routed" } }],
++    template_id: "time_off_approved_coverage",
++    created_by: "mgr-1",
++    updated_by: "mgr-1",
++    created_at: new Date().toISOString(),
++    updated_at: new Date().toISOString(),
++  };
++  const sb = fakeSupabase({
++    workflow_definitions: [wf],
++    workflow_runs: [],
++    workflow_run_steps: [],
++    audit_logs: [],
++    platform_audit_logs: [],
++    time_off_requests: [{
++      id: "pto-2",
++      organization_id: "org-a",
++      payload: { locationId: "loc-a", conflictCount: 1, employeeId: "emp-a" },
++    }],
++  });
++  const outcome = await processWorkflowEvent(sb, {
++    id: "evt-to-approved",
++    eventType: "timeoff.approved",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "pto-2",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "timeoff.approved:pto-2",
++    payload: { table: "time_off_requests", op: "UPDATE", employeeId: "emp-a" },
++  });
++  assert.equal(outcome.runsStarted, 1);
++  const run = (sb._tables.get("workflow_runs") || [])[0];
++  assert.equal(run.status, "completed");
++  assert.equal(run.conditions_met, true);
++  assert.equal(run.location_id, "loc-a");
++});
++
++test("workflow envelope locationId falls back to payload.locationId when the outbox column is empty", () => {
++  const envelope = toWorkflowEventEnvelope({
++    id: "evt-loc",
++    eventType: "inventory.updated",
++    schemaVersion: 2,
++    organizationId: "org-a",
++    locationId: null,
++    entityId: "item-1",
++    occurredAt: new Date().toISOString(),
++    actor: { source: "system" },
++    idempotencyKey: "inventory.updated:item-1",
++    payload: { locationId: "loc-a" },
++  });
++  assert.equal(envelope.locationId, "loc-a");
++});
++
+ test("pickWorkflowEventPayload copies time-off facts and still drops secrets", () => {
+   const payload = pickWorkflowEventPayload("time_off_requests", {
+     employeeId: "emp-a",
+-- 
+2.43.0
+
