@@ -39,7 +39,12 @@ if git show origin/main:server/workflow/workflowEngine.ts | grep -q "const tiers
 fi
 
 git checkout -B "$BRANCH" origin/main
-if git apply "$PATCH"; then
+ENGINE_SRC="$ROOT/workflowEngine.ts"
+if [ -f "$ENGINE_SRC" ] && grep -q "const tiers =" "$ENGINE_SRC"; then
+  echo "replacing server/workflow/workflowEngine.ts from operator kit (paste-over equivalent)"
+  cp "$ENGINE_SRC" server/workflow/workflowEngine.ts
+  git add server/workflow/workflowEngine.ts
+elif git apply "$PATCH"; then
   git add scripts/critical-deploy-gate.mjs server.ts server/ops/schemaContracts.ts \
     server/workflow/workflowEngine.ts \
     tests/automation_condition_operators_correlation_observability.test.ts \
@@ -48,6 +53,10 @@ else
   echo "full patch missed; applying engine-only 01b"
   git apply "$PATCH_ENGINE"
   git add server/workflow/workflowEngine.ts
+fi
+if ! grep -q "const tiers =" server/workflow/workflowEngine.ts; then
+  echo "refusing to commit: workflowEngine.ts still lacks four-tier createRun" >&2
+  exit 1
 fi
 git commit -m "fix(workflow): four-tier createRun when AG version columns are missing"
 git push -u origin "$BRANCH"
