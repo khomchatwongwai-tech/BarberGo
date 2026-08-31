@@ -1,6 +1,6 @@
 # Workqora createRun operator kit
 
-`origin/main` is `ab8a7af` (`#301` DATA-13). Live `/api/health` may still be `23cfa2d` until Render. Neither SHA includes four-tier `createRun`. The worker processes `employee.activated` but creates **zero** `workflow_runs` because production `createRun` always inserts `definition_version` while that column is missing.
+Live `/api/health` and `origin/main` are both `ab8a7af` (`#301` DATA-13). That SHA does **not** include four-tier `createRun`. The worker processes `employee.activated` but creates **zero** `workflow_runs` because production `createRun` always inserts `definition_version` while that column is missing.
 
 `#301` is Command Center `attentionQueue` / `answerContract` only. Do **not** fold this kit into DATA PRs. Recert worker-alone only after `/api/health` reports a SHA that contains four-tier `createRun`. Do not recert `23cfa2d` or `ab8a7af` for the same hole.
 
