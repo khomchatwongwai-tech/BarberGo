@@ -26,7 +26,7 @@ https://github.com/khomchatwongwai-tech/workqora/edit/main/server/workflow/workf
 
 Apply `01b-createrun-engine-only.patch` (four-tier `createRun` + schema-safe `updateRun`). That is enough for the worker to persist `workflow_runs` while `definition_version` is missing. Do not mix DATA, CRM, late, or hydration into that PR.
 
-Raw patch: https://raw.githubusercontent.com/khomchatwongwai-tech/BarberGo/cursor/workqora-createrun-operator-patch-bf1e/operator/workqora/01b-createrun-engine-only.patch
+Paste-over (no patch tool): https://github.com/khomchatwongwai-tech/workqora/issues/307 — replace `createRun` through `updateRun` in the GitHub file editor.
 
 
 Equivalent: apply `supabase/migrations/20260943000000_workflow_run_lifecycle_and_versioning.sql` on production Postgres (service role cannot DDL).
