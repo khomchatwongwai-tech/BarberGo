@@ -30,7 +30,7 @@ jobs:
           GH_TOKEN: ${{ secrets.WORKQORA_GITHUB_TOKEN }}
         run: |
           if [ -z "${WORKQORA_GITHUB_TOKEN}" ]; then
-            echo "WORKQORA_GITHUB_TOKEN is not set. Add it (Contents + PRs write on khomchatwongwai-tech/workqora) or paste-over issue 307."
+            echo "WORKQORA_GITHUB_TOKEN is not set. Add it (Contents + PRs write on khomchatwongwai-tech/workqora), install Cursor GitHub App on workqora (https://github.com/apps/cursor/installations/new), or paste-over https://github.com/khomchatwongwai-tech/workqora/issues/307."
             exit 0
           fi
           chmod +x operator/workqora/ship-createrun.sh
