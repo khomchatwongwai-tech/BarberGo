@@ -4,7 +4,14 @@ Live `GET /api/health` and `origin/main` are **`ba654bf`** (Workqora `#305` DATA
 
 Do **not** fold this into a DATA PR. Do **not** recert `ba654bf` for worker-alone while `definition_version` is still missing. Recert `ba654bf` only after those columns exist, or recert a later SHA whose `createRun` has `tiers` / `coreRow`. Keep `WORKQORA_AUTONOMOUS_MUTATION` false.
 
-This kit is **not** a Workqora merge. `cursor[bot]` on BarberGo cannot push Workqora (403). Someone with Workqora write must open the createRun-only PR.
+This kit is **not** a Workqora merge. `cursor[bot]` on BarberGo cannot push Workqora (403). The Cursor GitHub App installation for this Cloud Agent includes **only BarberGo**. `repositoryDependencies` in `.cursor/environment.json` does not add Workqora until the app is granted that repo, and **this running agent’s token will not refresh**.
+
+Unblock Cloud Agent push (then start a **new** agent; keep this one only for recert after merge):
+
+1. https://github.com/apps/cursor/installations/new — add **workqora** (or All repositories)
+2. or BarberGo Actions secret `WORKQORA_GITHUB_TOKEN` (Contents + PRs write on Workqora), then **Actions → Ship Workqora createRun PR**
+
+Someone with Workqora write can skip both and paste-over as below.
 
 ## Fastest path (GitHub website, one file)
 
