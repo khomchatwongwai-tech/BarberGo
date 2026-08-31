@@ -16,6 +16,11 @@ TMP="$(mktemp -d)"
 cleanup() { rm -rf "$TMP"; }
 trap cleanup EXIT
 
+if [ -n "${WORKQORA_GITHUB_TOKEN:-}" ]; then
+  export GH_TOKEN="$WORKQORA_GITHUB_TOKEN"
+fi
+gh auth setup-git >/dev/null
+
 git clone --depth 50 "$REPO" "$TMP/workqora"
 cd "$TMP/workqora"
 git checkout -B "$BRANCH" origin/main

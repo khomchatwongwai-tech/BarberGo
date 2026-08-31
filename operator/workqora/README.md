@@ -16,7 +16,7 @@ git push -u origin cursor/workflow-run-schema-fallback-bf1e
 gh pr create --base main --title "fix(workflow): four-tier createRun when AG version columns are missing"
 ```
 
-Or run `./operator/workqora/ship-createrun.sh` from this BarberGo checkout (uses your GitHub credentials, not cursor[bot]).
+Or run `./operator/workqora/ship-createrun.sh` from this BarberGo checkout (uses your GitHub credentials, or `WORKQORA_GITHUB_TOKEN` if set). Do not commit that token.
 
 Equivalent: apply `supabase/migrations/20260943000000_workflow_run_lifecycle_and_versioning.sql` on production Postgres (service role cannot DDL).
 
