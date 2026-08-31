@@ -13,7 +13,7 @@ You already merge DATA PRs in the GitHub editor. Do the same here, **instead of 
 1. Open  
    https://github.com/khomchatwongwai-tech/workqora/edit/main/server/workflow/workflowEngine.ts
 2. Select all and replace with this file (raw, copy all):  
-   https://raw.githubusercontent.com/khomchatwongwai-tech/BarberGo/cursor/workqora-createrun-paste-file-bf1e/operator/workqora/workflowEngine.ts
+   https://raw.githubusercontent.com/khomchatwongwai-tech/BarberGo/main/operator/workqora/workflowEngine.ts
 3. Commit to a **new branch** named `cursor/workflow-run-schema-fallback-bf1e` (not `main` if you prefer a PR).
 4. Open a pull request titled  
    `fix(workflow): four-tier createRun when AG version columns are missing`
@@ -39,7 +39,9 @@ gh pr create --base main --title "fix(workflow): four-tier createRun when AG ver
 
 ## Fastest schema path (Supabase SQL editor, no Render wait)
 
-Live two-step `createRun` would start inserting **on the current SHA** if these three columns exist. Open the Supabase SQL editor for the production project and run [`05-add-run-version-columns.sql`](./05-add-run-version-columns.sql). Do not run global claim RPCs. Then worker-alone can be recerted on `ba654bf` without a code deploy.
+Live two-step `createRun` would start inserting **on the current SHA** if these three columns exist. Open the Supabase SQL editor for the production project and run
+https://raw.githubusercontent.com/khomchatwongwai-tech/BarberGo/main/operator/workqora/05-add-run-version-columns.sql
+Do not run global claim RPCs. Then worker-alone can be recerted on `ba654bf` without a code deploy.
 
 The full Workqora migration `supabase/migrations/20260943000000_workflow_run_lifecycle_and_versioning.sql` is larger (versions table + RLS). The three-column file is enough for inserts.
 
