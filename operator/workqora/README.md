@@ -1,6 +1,6 @@
 # Workqora createRun operator kit
 
-`origin/main` is `8918b1d` (`#303` DATA-14). Live `/api/health` may lag on `ab8a7af` until Render. Neither SHA includes four-tier `createRun`. The worker processes `employee.activated` but creates **zero** `workflow_runs` because production `createRun` always inserts `definition_version` while that column is missing.
+`origin/main` and live `/api/health` are `8918b1d` (`#303` DATA-14). That SHA does **not** include four-tier `createRun`. The worker processes `employee.activated` but creates **zero** `workflow_runs` because production `createRun` always inserts `definition_version` while that column is missing.
 
 `#303` extends the existing data-quality engine only. Do **not** fold this kit into DATA PRs. Recert worker-alone only after `/api/health` reports a SHA that contains four-tier `createRun`. Do not recert `ab8a7af` or `8918b1d` for the same hole.
 
@@ -19,6 +19,8 @@ gh pr create --base main --title "fix(workflow): four-tier createRun when AG ver
 ```
 
 Or run `./operator/workqora/ship-createrun.sh` from this BarberGo checkout (uses your GitHub credentials, or `WORKQORA_GITHUB_TOKEN` if set). Do not commit that token.
+
+From GitHub: add BarberGo Actions secret `WORKQORA_GITHUB_TOKEN` (Contents + Pull requests write on Workqora), then run workflow **Ship Workqora createRun PR**.
 
 Equivalent: apply `supabase/migrations/20260943000000_workflow_run_lifecycle_and_versioning.sql` on production Postgres (service role cannot DDL).
 

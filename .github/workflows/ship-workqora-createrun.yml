@@ -1,0 +1,41 @@
+# Manual: open the Workqora createRun-only PR using a PAT that can write
+# khomchatwongwai-tech/workqora. This repo's GITHUB_TOKEN cannot.
+#
+# Setup (once):
+#   BarberGo → Settings → Secrets and variables → Actions
+#   Name: WORKQORA_GITHUB_TOKEN
+#   Value: a PAT or fine-grained token with Contents + Pull requests write
+#          on khomchatwongwai-tech/workqora
+# Then: Actions → "Ship Workqora createRun PR" → Run workflow
+name: Ship Workqora createRun PR
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout BarberGo kit
+        uses: actions/checkout@v4
+
+      - name: Require WORKQORA_GITHUB_TOKEN
+        env:
+          WORKQORA_GITHUB_TOKEN: ${{ secrets.WORKQORA_GITHUB_TOKEN }}
+        run: |
+          if [ -z "${WORKQORA_GITHUB_TOKEN}" ]; then
+            echo "Add Actions secret WORKQORA_GITHUB_TOKEN (Contents + PRs write on khomchatwongwai-tech/workqora), then re-run."
+            exit 1
+          fi
+
+      - name: Open createRun-only PR
+        env:
+          WORKQORA_GITHUB_TOKEN: ${{ secrets.WORKQORA_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WORKQORA_GITHUB_TOKEN }}
+        run: |
+          chmod +x operator/workqora/ship-createrun.sh
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          ./operator/workqora/ship-createrun.sh

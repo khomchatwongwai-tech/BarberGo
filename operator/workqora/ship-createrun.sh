@@ -33,4 +33,4 @@ git commit -m "fix(workflow): four-tier createRun when AG version columns are mi
 git push -u origin "$BRANCH"
 gh pr create --repo khomchatwongwai-tech/workqora --base main --head "$BRANCH" \
   --title "fix(workflow): four-tier createRun when AG version columns are missing" \
-  --body "Four-tier createRun so production can persist workflow_runs while AG version columns are missing. Do not mix CRM, late/no-show, or hydration. Recert worker-alone against the SHA reported by GET /api/health. Keep WORKQORA_AUTONOMOUS_MUTATION false. Closes nothing; see issue 296."
+  --body "Four-tier createRun so production can persist workflow_runs while AG version columns are missing. Do not mix CRM, late/no-show, hydration, or DATA PRs. Recert worker-alone against the SHA reported by GET /api/health. Keep WORKQORA_AUTONOMOUS_MUTATION false. See issue 304."
