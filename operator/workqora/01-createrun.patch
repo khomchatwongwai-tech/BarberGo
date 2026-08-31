@@ -1,3 +1,24 @@
+From a4e0cadf6cea5fbd68a8008ffc03f26c0facfc2b Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Mon, 31 Aug 2026 00:21:09 +0000
+Subject: [PATCH] fix(workflow): four-tier createRun when AG version columns
+ are missing
+
+Production createRun always sent definition_version, so inserts failed
+while those columns are absent even though correlation columns exist.
+Retry core+version+correlation, then version, then correlation, then
+core; stop on non-schema errors. Report missing version columns as
+degraded, refresh schema contracts on boot and first public health GET,
+and keep a single /api/health handler.
+---
+ scripts/critical-deploy-gate.mjs              |  1 +
+ server.ts                                     | 60 ++++---------
+ server/ops/schemaContracts.ts                 | 24 +++++
+ server/workflow/workflowEngine.ts             | 87 ++++++++++++-------
+ ...perators_correlation_observability.test.ts | 53 ++++++++++-
+ tests/schema_contracts.test.ts                | 27 ++++++
+ 6 files changed, 176 insertions(+), 76 deletions(-)
+
 diff --git a/scripts/critical-deploy-gate.mjs b/scripts/critical-deploy-gate.mjs
 index 21f6da9..958b3a9 100644
 --- a/scripts/critical-deploy-gate.mjs
@@ -376,3 +397,6 @@ index 3c2faff..0b2b1c7 100644
 +  assert.match(publicHealth, /handlePublicHealth\(req, res\)/);
 +  assert.equal((server.match(/app\.get\("\/api\/health"/g) || []).length, 1);
 +});
+-- 
+2.43.0
+

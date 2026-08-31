@@ -1,3 +1,19 @@
+From c750d048095cf9123d4688f4b47547cd4b62b668 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sun, 30 Aug 2026 22:31:11 +0000
+Subject: [PATCH] fix(automation): map late and no-show events to notify
+ handlers
+
+attendance.late and attendance.no_show already have typed notify executors.
+Wire them on the vertical map and topology so Gate B is not punch-only.
+Mutation stays off; notify is policy-gated the same as other low-risk alerts.
+---
+ server/automation/verticalEvents.ts           |  4 ++
+ server/events/eventTopology.ts                |  4 +-
+ tests/autonomous_operations_verticals.test.ts | 43 +++++++++++++++++++
+ tests/cx3_domain_event_topology.test.ts       | 11 +++++
+ 4 files changed, 60 insertions(+), 2 deletions(-)
+
 diff --git a/server/automation/verticalEvents.ts b/server/automation/verticalEvents.ts
 index 06d276d..333cf0b 100644
 --- a/server/automation/verticalEvents.ts
@@ -128,3 +144,6 @@ index e3c81a0..fbb8c0a 100644
      assert.equal(isVerticalMappedEvent('inventory.low'), true);
      assert.equal(verticalActionForEvent('inventory.low')?.actionType, 'inventory.low_stock_alert');
  
+-- 
+2.43.0
+

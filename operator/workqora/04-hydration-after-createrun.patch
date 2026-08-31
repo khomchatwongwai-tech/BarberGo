@@ -1,3 +1,20 @@
+From ac9b03ad64bb87edf51f0a0221905c375ae4540a Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sun, 30 Aug 2026 22:34:53 +0000
+Subject: [PATCH] fix(workflow): hydrate source-row facts before matching and
+ running workflows
+
+Live enqueue still stores {op, table} for several triggers. Copy location and
+condition facts from the tenant source row so location-scoped definitions and
+coverage/inventory/waste/repair conditions can evaluate without waiting on
+schema migrations. Tenant-scoped; does not invent swapRole or conflictCount.
+---
+ server/events/workflowEventFacts.ts           | 193 +++++++++++++++
+ server/workflow/eventEnvelope.ts              |  10 +-
+ server/workflow/workflowEngine.ts             |  13 +-
+ .../workflow_event_payload_enrichment.test.ts | 232 +++++++++++++++++-
+ 4 files changed, 441 insertions(+), 7 deletions(-)
+
 diff --git a/server/events/workflowEventFacts.ts b/server/events/workflowEventFacts.ts
 index cc0dc3f..5355847 100644
 --- a/server/events/workflowEventFacts.ts
@@ -538,3 +555,6 @@ index 63b3e48..d9e316f 100644
  test("pickWorkflowEventPayload copies time-off facts and still drops secrets", () => {
    const payload = pickWorkflowEventPayload("time_off_requests", {
      employeeId: "emp-a",
+-- 
+2.43.0
+

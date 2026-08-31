@@ -1,3 +1,20 @@
+From ca9c26319138e6db7ac798b0938873966a1915ae Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Sun, 30 Aug 2026 22:28:55 +0000
+Subject: [PATCH] fix(automation): register CRM notify actions so follow-up
+ events process
+
+#283 mapped crm.followup_due and crm.risk_detected onto typed actions that
+were not in the catalog, so the production worker failed the outbox with
+UNKNOWN_ACTION. Add notify-only definitions and handlers, fail-soft unknown
+mappings, and keep mutation off. No CRM table writes.
+---
+ .../handlers/verticalActionHandlers.ts        |  2 +
+ server/automation/typedActionRegistry.ts      |  2 +
+ server/automation/verticalEvents.ts           | 72 ++++++++++--------
+ tests/autonomous_operations_verticals.test.ts | 73 ++++++++++++++++++-
+ 4 files changed, 119 insertions(+), 30 deletions(-)
+
 diff --git a/server/automation/handlers/verticalActionHandlers.ts b/server/automation/handlers/verticalActionHandlers.ts
 index 10d9a2f..1b47998 100644
 --- a/server/automation/handlers/verticalActionHandlers.ts
@@ -209,3 +226,6 @@ index 79d58d3..ae57bff 100644
 +    delete VERTICAL_EVENT_ACTIONS['crm.task_completed'];
 +  }
 +});
+-- 
+2.43.0
+
