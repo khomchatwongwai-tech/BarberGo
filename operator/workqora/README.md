@@ -12,8 +12,8 @@ You already merge DATA PRs in the GitHub editor. Do the same here, **instead of 
 
 1. Open  
    https://github.com/khomchatwongwai-tech/workqora/edit/main/server/workflow/workflowEngine.ts
-2. Select all and replace with  
-   [`workflowEngine.ts`](./workflowEngine.ts) from this folder (four-tier `createRun` + schema-safe `updateRun`, based on `ba654bf`).
+2. Select all and replace with this file (raw, copy all):  
+   https://raw.githubusercontent.com/khomchatwongwai-tech/BarberGo/cursor/workqora-createrun-paste-file-bf1e/operator/workqora/workflowEngine.ts
 3. Commit to a **new branch** named `cursor/workflow-run-schema-fallback-bf1e` (not `main` if you prefer a PR).
 4. Open a pull request titled  
    `fix(workflow): four-tier createRun when AG version columns are missing`
