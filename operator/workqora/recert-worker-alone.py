@@ -5,9 +5,10 @@ Creates a synthetic org, emits employee.activated, waits for the Render
 domain-event dispatcher (does NOT call claim_pending_domain_events),
 asserts a workflow_runs row for that event_id, then deletes the org.
 
-Refuses to run while workflow_runs.definition_version is missing, unless
-the live SHA already has four-tier createRun. Does not print secrets.
-Keep WORKQORA_AUTONOMOUS_MUTATION false.
+Refuses to run while workflow_runs.definition_version is missing AND live
+createRun is still the two-step #279 path. If GitHub source for the live
+SHA cannot be fetched, proceeds with an empirical worker test instead of
+crashing. Does not print secrets. Keep WORKQORA_AUTONOMOUS_MUTATION false.
 """
 from __future__ import annotations
 
@@ -72,8 +73,12 @@ def rest(method: str, path: str, body: dict | None = None, extra: dict | None = 
         return err.code, parsed
 
 
-def live_create_run_is_four_tier() -> tuple[str, bool]:
-    """True when GET /api/health SHA's createRun uses tiers/coreRow, not #279 baseRow."""
+def live_create_run_is_four_tier() -> tuple[str, bool | None]:
+    """True when GET /api/health SHA's createRun uses tiers/coreRow, not #279 baseRow.
+
+    None means the live SHA source could not be fetched (private repo / 404).
+    Do not treat that as two-step — skip would hide a working worker.
+    """
     with urllib.request.urlopen("https://www.workqora.com/api/health", timeout=30) as resp:
         health = json.loads(resp.read().decode())
     sha = str(health.get("commitSha") or "").strip()
@@ -83,8 +88,15 @@ def live_create_run_is_four_tier() -> tuple[str, bool]:
         "https://raw.githubusercontent.com/khomchatwongwai-tech/workqora/"
         f"{sha}/server/workflow/workflowEngine.ts"
     )
-    with urllib.request.urlopen(url, timeout=30) as resp:
-        source = resp.read().decode()
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            source = resp.read().decode()
+    except urllib.error.HTTPError as err:
+        print("WARN cannot fetch createRun source", err.code)
+        return sha, None
+    except urllib.error.URLError as err:
+        print("WARN cannot fetch createRun source", type(err.reason).__name__)
+        return sha, None
     idx = source.find("async function createRun")
     chunk = source[idx : idx + 4000] if idx >= 0 else ""
     return sha, ("const tiers" in chunk and "coreRow" in chunk)
@@ -121,13 +133,18 @@ def main() -> int:
     columns = openapi_workflow_run_columns()
     sha, four_tier = live_create_run_is_four_tier()
     print("liveSha", sha, "fourTierCreateRun", four_tier)
-    if "definition_version" not in columns and not four_tier:
+    if "definition_version" not in columns and four_tier is False:
         print(
             "SKIP definition_version still missing and live createRun is still two-step. "
             "Apply operator/workqora/05-add-run-version-columns.sql or ship four-tier createRun."
         )
         print("columns", columns)
         return 2
+    if "definition_version" not in columns and four_tier is None:
+        print(
+            "WARN source unverifiable; proceeding with empirical worker recert "
+            "(correlation_id present is enough for four-tier C if createRun shipped)."
+        )
 
     stamp = uuid.uuid4().hex[:12]
     org_id = f"org_bhcert_{stamp}"
@@ -249,8 +266,17 @@ def main() -> int:
         print("PASS worker-alone", runs[0].get("id"), "status", runs[0].get("status"))
         return 0
     finally:
-        dcode, dbody = rest("DELETE", f"organizations?id=eq.{org_id}", extra={"Prefer": "return=minimal"})
-        print("cleanup_org", dcode)
+        for path in (
+            f"workflow_run_steps?organization_id=eq.{org_id}",
+            f"workflow_runs?organization_id=eq.{org_id}",
+            f"domain_events?organization_id=eq.{org_id}",
+            f"workflow_definitions?organization_id=eq.{org_id}",
+            f"employees?organization_id=eq.{org_id}",
+            f"locations?organization_id=eq.{org_id}",
+            f"organizations?id=eq.{org_id}",
+        ):
+            dcode, _dbody = rest("DELETE", path, extra={"Prefer": "return=minimal"})
+            print("cleanup", path.split("?")[0], dcode)
 
 
 if __name__ == "__main__":
