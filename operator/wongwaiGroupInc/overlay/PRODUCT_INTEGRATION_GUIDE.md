@@ -120,4 +120,3 @@ Default payload: aggregates, scores, authorized IDs. Do not send PIN, SSN, wages
 MarketMind quality must be the provider quality (`LIVE` / `DELAYED` / `CACHED` / `FALLBACK` / `STALE` / `PARTIAL` / `UNAVAILABLE`). Do not mint a new quote because a second elapsed.
 
 Owner APIs (session required): `GET /api/corporate/products`, `GET /api/corporate/products/:id`, `GET /api/corporate/health`.
-

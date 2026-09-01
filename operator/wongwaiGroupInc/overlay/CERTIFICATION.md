@@ -1,6 +1,6 @@
 # WONGWAI GROUP INC — PRODUCTION CERTIFICATION (HONEST)
 
-Date: 2026-09-01  
+Date: 2026-09-01
 This is **not** a 100 score. Code exists for the corporate control plane. Production, CI merge, and live connectors are **not** certified.
 
 ## WONGWAI GROUP INC

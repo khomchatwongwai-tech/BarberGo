@@ -134,7 +134,7 @@ async function startServer() {
     });
   });
 
-  app.get('/api/ready', (req: Request, res: Response) => {
+  const readyHandler = (_req: Request, res: Response) => {
     const database = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
       ? 'configured'
       : 'unavailable';
@@ -150,7 +150,9 @@ async function startServer() {
         ? ['Supabase is not configured. Corporate tables are in-process memory only.']
         : [],
     });
-  });
+  };
+  app.get('/api/ready', readyHandler);
+  app.get('/api/health/ready', readyHandler);
 
   mountCorporateRoutes(app);
 

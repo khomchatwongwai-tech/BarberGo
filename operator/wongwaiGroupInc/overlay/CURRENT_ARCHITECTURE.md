@@ -1,7 +1,7 @@
 # CURRENT ARCHITECTURE — Wongwai Group Inc
 
-Audit date: 2026-09-01  
-Repository audited: `khomchatwongwai-tech/wongwaiGroupInc` (`main` SHA `6d8c79a6e0f93a77ae29921fefa9a8d1647ddd56`)  
+Audit date: 2026-09-01
+Repository audited: `khomchatwongwai-tech/wongwaiGroupInc` (`main` SHA `6d8c79a6e0f93a77ae29921fefa9a8d1647ddd56`)
 This document classifies capabilities. It does not certify production.
 
 ## Runtime observed during this audit
