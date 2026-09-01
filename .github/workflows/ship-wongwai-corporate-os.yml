@@ -1,0 +1,38 @@
+# Opens the Wongwai Group Inc corporate-OS PR using a PAT that can write
+# khomchatwongwai-tech/wongwaiGroupInc. This repo's GITHUB_TOKEN cannot.
+#
+# Setup (once):
+#   BarberGo → Settings → Secrets and variables → Actions
+#   Name: WONGWAI_GITHUB_TOKEN
+#   Value: a PAT or fine-grained token with Contents + Pull requests write
+#          on khomchatwongwai-tech/wongwaiGroupInc
+# Then: Actions → "Ship Wongwai Corporate OS PR" → Run workflow
+name: Ship Wongwai Corporate OS PR
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout BarberGo kit
+        uses: actions/checkout@v4
+
+      - name: Open Wongwai overlay PR when token is present
+        env:
+          WONGWAI_GITHUB_TOKEN: ${{ secrets.WONGWAI_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WONGWAI_GITHUB_TOKEN }}
+        run: |
+          if [ -z "${WONGWAI_GITHUB_TOKEN}" ]; then
+            echo "WONGWAI_GITHUB_TOKEN is not set. Add it (Contents + PRs write on khomchatwongwai-tech/wongwaiGroupInc) or install the Cursor GitHub App on that repo: https://github.com/apps/cursor/installations/new"
+            exit 0
+          fi
+          chmod +x operator/wongwaiGroupInc/ship.sh
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          ./operator/wongwaiGroupInc/ship.sh

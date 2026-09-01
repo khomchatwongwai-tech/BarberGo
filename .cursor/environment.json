@@ -1,6 +1,8 @@
 {
   "name": "BarberGo with Workqora",
   "repositoryDependencies": [
-    "github.com/khomchatwongwai-tech/workqora"
+    "github.com/khomchatwongwai-tech/workqora",
+    "github.com/khomchatwongwai-tech/wongwaiGroupInc",
+    "github.com/khomchatwongwai-tech/MarketMind-AI"
   ]
 }

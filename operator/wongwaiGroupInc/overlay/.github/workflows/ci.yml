@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm lint
+      - name: Unit tests
+        run: pnpm test
+      - name: Zero-secret gate
+        run: node scripts/zero-secret-gate.mjs
+      - name: Zero-demo production gate
+        run: node scripts/zero-demo-production-gate.mjs
+      - name: Build
+        run: pnpm build
+      - name: Server boot smoke
+        run: |
+          node dist/server.cjs &
+          pid=$!
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS http://127.0.0.1:3000/api/health; then
+              kill "$pid" || true
+              exit 0
+            fi
+            sleep 1
+          done
+          kill "$pid" || true
+          echo "server did not become healthy"
+          exit 1
