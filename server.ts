@@ -11,6 +11,17 @@ import {
 } from './server/gemini';
 import { rankBarbersForCustomer, parseNaturalLanguageQuery } from './server/matching';
 import { Booking, BookingStatus, UserRole } from './src/types';
+import {
+  ingestFile,
+  applyReview,
+  intelligenceStore,
+  operationalEventBus,
+  ingestionTelemetry,
+  registerIntelligenceSubscribers,
+  IngestionError,
+  type TenantContext,
+  type ReviewDecision,
+} from './server/intelligence/index';
 
 dotenv.config();
 
@@ -22,7 +33,9 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3002);
 
-  app.use(express.json({ limit: '10mb' }));
+  // 35mb accommodates base64-encoded document uploads (~33% inflation) for the
+  // Universal File Intelligence ingest endpoint.
+  app.use(express.json({ limit: '35mb' }));
   app.use(express.urlencoded({ extended: true }));
 
   const isDemoMode = (process.env.APP_MODE || 'demo') !== 'production';
@@ -1245,6 +1258,197 @@ async function startServer() {
     profile.subscriptionRenewalDate = new Date(Date.now() + 30 * 86400000).toISOString();
 
     res.json({ success: true, profile });
+  });
+
+  // ----------------------------------------------------
+  // WORKQORA UNIVERSAL FILE INTELLIGENCE
+  // ----------------------------------------------------
+  registerIntelligenceSubscribers();
+
+  // Tenant identity is derived from the authenticated server session — never
+  // from the request body. This demo derives a stable org id from the platform
+  // name and a single primary location.
+  const orgSlug = (db.settings.appName || 'workqora')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  const deriveTenant = (req: express.Request): TenantContext => {
+    const user = requestUser(req);
+    return {
+      organizationId: `org_${orgSlug}`,
+      locationId: 'loc_primary',
+      actorUserId: user?.id,
+      actorKind: 'user',
+    };
+  };
+
+  const HTTP_STATUS_FOR_CODE: Record<string, number> = {
+    UNSUPPORTED_FILE: 415,
+    FILE_TOO_LARGE: 413,
+    MALFORMED_DOCUMENT: 400,
+    OCR_FAILED: 422,
+    LOW_CONFIDENCE: 422,
+    PARSER_FAILED: 422,
+    ENTITY_RESOLUTION_REQUIRED: 409,
+    TENANT_ACCESS_DENIED: 403,
+    DUPLICATE_DOCUMENT: 409,
+    MUTATION_REQUIRES_CONFIRMATION: 409,
+    PROVIDER_UNAVAILABLE: 503,
+    NOT_IMPLEMENTED: 501,
+  };
+  const sendIngestionError = (res: express.Response, err: unknown) => {
+    if (err instanceof IngestionError) {
+      const status = HTTP_STATUS_FOR_CODE[err.code] ?? 400;
+      return res.status(status).json({
+        error: err.message,
+        code: err.code,
+        retryable: err.retryable,
+        details: err.details,
+      });
+    }
+    console.error('[intelligence] unexpected error:', err);
+    return res.status(500).json({ error: 'Internal ingestion error', code: 'PARSER_FAILED' });
+  };
+
+  // Serialize a stored document detail for API responses (trims raw text).
+  const serializeDetail = (detail: ReturnType<typeof intelligenceStore.getDocument>) => {
+    if (!detail) return null;
+    return {
+      document: detail.document,
+      classification: detail.classification,
+      extraction: detail.extraction
+        ? {
+            method: detail.extraction.method,
+            confidence: detail.extraction.confidence,
+            rowCount: detail.extraction.rowCount,
+            textPreview: detail.extraction.rawText.slice(0, 800),
+          }
+        : undefined,
+      rosterRows: detail.rosterRows,
+      reviewStatus: detail.reviewStatus,
+      reviewedBy: detail.reviewedBy,
+      reviewedAt: detail.reviewedAt,
+      links: detail.links,
+      processingRuns: detail.processingRuns,
+    };
+  };
+
+  // Drop-to-ingest: accepts a base64-encoded file, runs the universal pipeline.
+  app.post('/api/intelligence/ingest', async (req, res) => {
+    const user = requireRoles(req, res, ['admin', 'support']);
+    if (!user) return;
+    try {
+      const { filename, mimeType, dataBase64, source, purpose } = req.body || {};
+      if (!filename || !dataBase64) {
+        return res.status(400).json({ error: 'filename and dataBase64 are required', code: 'MALFORMED_DOCUMENT' });
+      }
+      const base64 = String(dataBase64).includes(',')
+        ? String(dataBase64).split(',').pop()!
+        : String(dataBase64);
+      const bytes = new Uint8Array(Buffer.from(base64, 'base64'));
+
+      const outcome = await ingestFile({
+        tenant: deriveTenant(req),
+        source: source || 'file_upload',
+        originalFilename: filename,
+        declaredMimeType: mimeType,
+        bytes,
+        ingestionPurpose: purpose || 'employee_import',
+      });
+
+      db.auditLogs.unshift({
+        id: `audit-${Date.now()}`,
+        adminId: user.id,
+        adminName: user.fullName,
+        action: outcome.deduplicated ? 'INTELLIGENCE_INGEST_DUPLICATE' : 'INTELLIGENCE_INGEST',
+        targetType: 'document',
+        targetId: outcome.document.documentId,
+        details: `Ingested "${outcome.document.originalFilename}" as ${outcome.classification?.category} (${outcome.rosterRows.length} rows)`,
+        timestamp: new Date().toISOString(),
+      });
+
+      res.json({
+        ...outcome,
+        detail: serializeDetail(intelligenceStore.getDocument(outcome.document.documentId)),
+      });
+    } catch (err) {
+      sendIngestionError(res, err);
+    }
+  });
+
+  app.get('/api/intelligence/documents', (req, res) => {
+    const user = requireRoles(req, res, ['admin', 'support']);
+    if (!user) return;
+    const tenant = deriveTenant(req);
+    const docs = intelligenceStore.listDocuments(tenant).map((d) => ({
+      document: d.document,
+      classification: d.classification,
+      reviewStatus: d.reviewStatus,
+      rowCount: d.rosterRows.length,
+    }));
+    res.json(docs);
+  });
+
+  app.get('/api/intelligence/documents/:id', (req, res) => {
+    const user = requireRoles(req, res, ['admin', 'support']);
+    if (!user) return;
+    const tenant = deriveTenant(req);
+    const detail = intelligenceStore.getDocument(req.params.id);
+    if (!detail || detail.document.organizationId !== tenant.organizationId) {
+      return res.status(404).json({ error: 'Document not found', code: 'TENANT_ACCESS_DENIED' });
+    }
+    res.json(serializeDetail(detail));
+  });
+
+  app.post('/api/intelligence/documents/:id/review', (req, res) => {
+    const user = requireRoles(req, res, ['admin']);
+    if (!user) return;
+    try {
+      const { decision, selectedRowIndexes } = req.body || {};
+      const result = applyReview({
+        tenant: deriveTenant(req),
+        documentId: req.params.id,
+        decision: (decision as ReviewDecision) || 'approve_all_safe',
+        selectedRowIndexes,
+      });
+      db.auditLogs.unshift({
+        id: `audit-${Date.now()}`,
+        adminId: user.id,
+        adminName: user.fullName,
+        action: 'INTELLIGENCE_REVIEW',
+        targetType: 'document',
+        targetId: req.params.id,
+        details: `Review ${decision}: created ${result.created}, updated ${result.updated}`,
+        timestamp: new Date().toISOString(),
+      });
+      res.json({ ...result, detail: serializeDetail(intelligenceStore.getDocument(req.params.id)) });
+    } catch (err) {
+      sendIngestionError(res, err);
+    }
+  });
+
+  app.get('/api/intelligence/employees', (req, res) => {
+    const user = requireRoles(req, res, ['admin', 'support']);
+    if (!user) return;
+    res.json(intelligenceStore.listEmployees(deriveTenant(req)));
+  });
+
+  app.get('/api/intelligence/events', (req, res) => {
+    const user = requireRoles(req, res, ['admin', 'support']);
+    if (!user) return;
+    const tenant = deriveTenant(req);
+    res.json(
+      operationalEventBus.recent({
+        organizationId: tenant.organizationId,
+        limit: Number(req.query.limit) || 100,
+      }),
+    );
+  });
+
+  app.get('/api/intelligence/observability', (req, res) => {
+    const user = requireRoles(req, res, ['admin', 'support']);
+    if (!user) return;
+    res.json(ingestionTelemetry.snapshot());
   });
 
   // ----------------------------------------------------

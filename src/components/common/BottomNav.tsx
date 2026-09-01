@@ -13,7 +13,8 @@ import {
   FileCheck2,
   AlertCircle,
   Settings,
-  CreditCard
+  CreditCard,
+  Network
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -57,6 +58,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       case 'admin':
         return [
           { id: 'overview', label: t('tabAdminOverview'), icon: <LayoutDashboard className="h-5 w-5" /> },
+          { id: 'file_intelligence', label: 'File AI', icon: <Network className="h-5 w-5" /> },
           { id: 'verifications', label: t('tabAdminVerifications'), icon: <FileCheck2 className="h-5 w-5" /> },
           { id: 'bookings', label: t('tabBookings'), icon: <Calendar className="h-5 w-5" /> },
           { id: 'payments', label: t('tabAdminPayments'), icon: <CreditCard className="h-5 w-5" /> },
